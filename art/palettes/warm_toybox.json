@@ -1,0 +1,373 @@
+{
+  "id": "warm_toybox",
+  "letter": "B",
+  "title": "Warm Toybox",
+  "mood": "Painted wooden toys on a sunny rug: butter, marigold, raspberry and teal sky, cosy and chunky.",
+  "colours": [
+    {
+      "key": "ink",
+      "name": "Burnt Walnut",
+      "hex": "#100906",
+      "group": "ink",
+      "role": "Outlines, eyes, mouths, all ink lines"
+    },
+    {
+      "key": "cloud",
+      "name": "Cream",
+      "hex": "#FFF3DA",
+      "group": "neutral",
+      "role": "Clouds, highlights, eye whites, UI cards"
+    },
+    {
+      "key": "stone",
+      "name": "Putty",
+      "hex": "#C4B194",
+      "group": "neutral",
+      "role": "UI panels, rim light on dark costume parts; Worm rock ring"
+    },
+    {
+      "key": "sky1",
+      "name": "Butter Horizon",
+      "hex": "#FFE6A8",
+      "group": "sky",
+      "role": "Sky tier 1: ground level"
+    },
+    {
+      "key": "sky2",
+      "name": "Toy Teal Sky",
+      "hex": "#8ADCD2",
+      "group": "sky",
+      "role": "Sky tier 2: high sky"
+    },
+    {
+      "key": "sky3",
+      "name": "Sailor Blue",
+      "hex": "#4FB0E0",
+      "group": "sky",
+      "role": "Sky tier 3: cloud deck"
+    },
+    {
+      "key": "sky4",
+      "name": "Paint-Tin Blue",
+      "hex": "#4C7BDA",
+      "group": "sky",
+      "role": "Sky tier 4: stratosphere"
+    },
+    {
+      "key": "sky5",
+      "name": "Plum Space",
+      "hex": "#7C5CC4",
+      "group": "sky",
+      "role": "Sky tier 5: outer space"
+    },
+    {
+      "key": "grass",
+      "name": "Felt Green",
+      "hex": "#9CCB3B",
+      "group": "ground",
+      "role": "Grass, leaves, pitch"
+    },
+    {
+      "key": "topsoil",
+      "name": "Oak",
+      "hex": "#BC8A44",
+      "group": "ground",
+      "role": "Dirt, wooden blocks; Worm ring 1 (topsoil)"
+    },
+    {
+      "key": "clay",
+      "name": "Biscuit",
+      "hex": "#E9A86E",
+      "group": "ground",
+      "role": "Paths, sand, skin placeholder; Worm ring 2 (clay)"
+    },
+    {
+      "key": "magma",
+      "name": "Marigold",
+      "hex": "#FFA020",
+      "group": "accent",
+      "role": "Sparkles, stars, Jeff's beak; Worm core"
+    },
+    {
+      "key": "comb",
+      "name": "Raspberry",
+      "hex": "#D9428A",
+      "group": "accent",
+      "role": "Jeff's comb, hearts, pops, confetti"
+    },
+    {
+      "key": "p1_green",
+      "name": "Player Green",
+      "hex": "#3CC24A",
+      "group": "fixed",
+      "role": "P1 accents: Jeff's wing tips, headband, stitching"
+    },
+    {
+      "key": "p2_red",
+      "name": "Player Red",
+      "hex": "#E4393C",
+      "group": "fixed",
+      "role": "P2 accents: Chuck's hat brim, tie-dye swirl, boot stitching"
+    },
+    {
+      "key": "jeff_yellow",
+      "name": "Costume Yellow",
+      "hex": "#FFD84D",
+      "group": "fixed",
+      "role": "Jeff's chicken costume; Chuck's hat emblem"
+    },
+    {
+      "key": "jeans_blue",
+      "name": "Jeans Blue",
+      "hex": "#3B5BA5",
+      "group": "fixed",
+      "role": "Jeans (both characters)"
+    },
+    {
+      "key": "boots_brown",
+      "name": "Boots Brown",
+      "hex": "#8A5A2B",
+      "group": "fixed",
+      "role": "Chuck's cowboy boots"
+    },
+    {
+      "key": "hat_black",
+      "name": "Hat Near-Black",
+      "hex": "#2B2B33",
+      "group": "fixed",
+      "role": "Chuck's trucker hat body"
+    },
+    {
+      "key": "shirt_black",
+      "name": "Shirt Black",
+      "hex": "#1E1E26",
+      "group": "fixed",
+      "role": "Chuck's tie-dye shirt base"
+    }
+  ],
+  "sky_ramp": [
+    "sky1",
+    "sky2",
+    "sky3",
+    "sky4",
+    "sky5"
+  ],
+  "worm_rings": [
+    "topsoil",
+    "clay",
+    "stone",
+    "magma"
+  ],
+  "checks": [
+    {
+      "check": "count",
+      "subject": "colours in palette",
+      "value": 20,
+      "need": "16-20",
+      "pass": true
+    },
+    {
+      "check": "sky.tiers",
+      "subject": "sky colours",
+      "value": 5,
+      "need": ">=5",
+      "pass": true
+    },
+    {
+      "check": "sky.step",
+      "subject": "sky1->sky2 dE00",
+      "value": 28.8,
+      "need": ">=12",
+      "pass": true
+    },
+    {
+      "check": "sky.step",
+      "subject": "sky2->sky3 dE00",
+      "value": 22.2,
+      "need": ">=12",
+      "pass": true
+    },
+    {
+      "check": "sky.step",
+      "subject": "sky3->sky4 dE00",
+      "value": 19.2,
+      "need": ">=12",
+      "pass": true
+    },
+    {
+      "check": "sky.step",
+      "subject": "sky4->sky5 dE00",
+      "value": 16.3,
+      "need": ">=12",
+      "pass": true
+    },
+    {
+      "check": "sky.order",
+      "subject": "L* falls every tier (ground to space)",
+      "value": "92 > 83 > 68 > 53 > 47",
+      "need": "strictly falling",
+      "pass": true
+    },
+    {
+      "check": "player.world",
+      "subject": "p1_green vs nearest ring/sky (sky2) dE00",
+      "value": 25.3,
+      "need": ">=25",
+      "pass": true
+    },
+    {
+      "check": "player.world",
+      "subject": "p2_red vs nearest ring/sky (clay) dE00",
+      "value": 30.0,
+      "need": ">=25",
+      "pass": true
+    },
+    {
+      "check": "player.deutan",
+      "subject": "green vs red, Machado deuteranopia dE00",
+      "value": 9.5,
+      "need": ">=20",
+      "pass": false
+    },
+    {
+      "check": "ink.contrast",
+      "subject": "cloud vs ink WCAG",
+      "value": 17.94,
+      "need": ">=3",
+      "pass": true
+    },
+    {
+      "check": "ink.contrast",
+      "subject": "stone vs ink WCAG",
+      "value": 9.46,
+      "need": ">=3",
+      "pass": true
+    },
+    {
+      "check": "ink.contrast",
+      "subject": "sky1 vs ink WCAG",
+      "value": 16.11,
+      "need": ">=3",
+      "pass": true
+    },
+    {
+      "check": "ink.contrast",
+      "subject": "sky2 vs ink WCAG",
+      "value": 12.45,
+      "need": ">=3",
+      "pass": true
+    },
+    {
+      "check": "ink.contrast",
+      "subject": "sky3 vs ink WCAG",
+      "value": 8.1,
+      "need": ">=3",
+      "pass": true
+    },
+    {
+      "check": "ink.contrast",
+      "subject": "sky4 vs ink WCAG",
+      "value": 4.84,
+      "need": ">=3",
+      "pass": true
+    },
+    {
+      "check": "ink.contrast",
+      "subject": "sky5 vs ink WCAG",
+      "value": 3.93,
+      "need": ">=3",
+      "pass": true
+    },
+    {
+      "check": "ink.contrast",
+      "subject": "grass vs ink WCAG",
+      "value": 10.36,
+      "need": ">=3",
+      "pass": true
+    },
+    {
+      "check": "ink.contrast",
+      "subject": "topsoil vs ink WCAG",
+      "value": 6.45,
+      "need": ">=3",
+      "pass": true
+    },
+    {
+      "check": "ink.contrast",
+      "subject": "clay vs ink WCAG",
+      "value": 9.67,
+      "need": ">=3",
+      "pass": true
+    },
+    {
+      "check": "ink.contrast",
+      "subject": "magma vs ink WCAG",
+      "value": 9.68,
+      "need": ">=3",
+      "pass": true
+    },
+    {
+      "check": "ink.contrast",
+      "subject": "comb vs ink WCAG",
+      "value": 4.79,
+      "need": ">=3",
+      "pass": true
+    },
+    {
+      "check": "ink.contrast",
+      "subject": "p1_green vs ink WCAG",
+      "value": 8.47,
+      "need": ">=3",
+      "pass": true
+    },
+    {
+      "check": "ink.contrast",
+      "subject": "p2_red vs ink WCAG",
+      "value": 4.65,
+      "need": ">=3",
+      "pass": true
+    },
+    {
+      "check": "ink.contrast",
+      "subject": "jeff_yellow vs ink WCAG",
+      "value": 14.27,
+      "need": ">=3",
+      "pass": true
+    },
+    {
+      "check": "ink.contrast",
+      "subject": "jeans_blue vs ink WCAG",
+      "value": 3.03,
+      "need": ">=3",
+      "pass": true
+    },
+    {
+      "check": "ink.contrast",
+      "subject": "boots_brown vs ink WCAG",
+      "value": 3.36,
+      "need": ">=3",
+      "pass": true
+    },
+    {
+      "check": "ink.rim",
+      "subject": "hat_black vs rim (stone) WCAG",
+      "value": 6.73,
+      "need": ">=3",
+      "pass": true
+    },
+    {
+      "check": "ink.rim",
+      "subject": "shirt_black vs rim (stone) WCAG",
+      "value": 7.93,
+      "need": ">=3",
+      "pass": true
+    },
+    {
+      "check": "comb.not_red",
+      "subject": "comb (comb) vs player red dE00",
+      "value": 20.8,
+      "need": ">=15",
+      "pass": true
+    }
+  ]
+}
