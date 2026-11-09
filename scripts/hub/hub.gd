@@ -1,5 +1,6 @@
 ## The hub: a floating island at magic hour where Jarlings walk up to giant jars and jump in to play.
-## Flow: boot → hub (standing at the last game's jar) → A → jump in → (game runs) → pop back out.
+## Flow: boot → hub (standing at the last game's jar) → A → launch animation (LaunchSequence: lid
+## spins off, Jarling leaps in, camera dives into the jar's tiny world) → (game runs) → pop back out.
 ## Owns the Save keys (LauncherState), the manifest list and the child process.
 ## Start quits to Steam (exit code 0) except while a game runs.
 extends Node3D
@@ -15,11 +16,17 @@ const MINIMIZE_WHILE_RUNNING := true
 const HOP_REPEAT := 0.45          # holding the stick sideways hops again this often
 const INTRO_SECONDS := 2.6        # the camera glides in from the wide shot; input works throughout
 const SKY_SHADER := preload("res://assets/shaders/hub/sky.gdshader")
-## Profile id → Jarling. Jeff is the green one, Chuck the red one, always.
+## Profile id → Jarling: two generic kit Jarlings, a grown-up and a kid. Not player-locked.
 const MODELS := {
-	"p1": preload("res://assets/models/jarlings/jeff.glb"),
-	"p2": preload("res://assets/models/jarlings/chuck.glb"),
+	"p1": preload("res://assets/models/jarlings/grownup.glb"),
+	"p2": preload("res://assets/models/jarlings/kid.glb"),
 }
+const SIZES := {"p1": 1.15, "p2": 0.86}
+## Jeff (P1 side, left) and Chuck (P2 side, right) live on the island; nobody controls them.
+const RESIDENTS := [
+	[preload("res://assets/models/jarlings/jeff.glb"), Vector3(-5.6, 0, 1.4)],
+	[preload("res://assets/models/jarlings/chuck.glb"), Vector3(5.6, 0, 1.4)],
+]
 const SUN_DIR := Vector3(0.42, 0.2, -1.0)   # the sun you see: low behind the jars, a little to the right
 ## The light itself comes from higher up on the same bearing, so shadows stay short and crisp.
 const LIGHT_DIR := Vector3(0.42, 0.46, -1.0)
@@ -31,15 +38,24 @@ var root_dir := ""
 var all_entries: Array[Dictionary] = []
 var entries: Array[Dictionary] = []      # the ones with a jar (dev filter applied)
 var spots: Array[GameSpot] = []
-var jarlings: Array[HubJarling] = []     # [Jeff (p1), Chuck (p2)]
+var jarlings: Array[HubJarling] = []     # [grown-up (p1), kid (p2)]
+var residents: Array[HubJarling] = []    # [Jeff, Chuck]
+var launch := LaunchSequence.new()       # active while the launch animation plays
 var focus: Array[int] = [-1, -1]         # jar each Jarling is looking into, by Jarling index
-var profile := "p1"                      # the Jarling picked for solo play; remembered
+var profile := "p1"                      # the Jarling player 1 picked; remembered
 var two_players := false
 
 var _pid := -1
 var _running_slug := ""
-var _launching := false
 var _launcher_index := 0
+var _launch_spot: GameSpot
+var _launch_cmd := {}
+var _launch_from := Vector3.ZERO         # where the Jarling stood when A was pressed
+var _launch_cam: Array[Vector3] = [Vector3.ZERO, Vector3.ZERO]
+var _lid_ground := Vector3.ZERO
+var _dived := false                      # the camera is inside the jar (until the game returns)
+var _cam_snap := false
+var _flash: ColorRect
 var _window_mode_before_run := -1
 var _input_from_ms := 0
 var _dev_combo := HoldCombo.new(1.0)
@@ -67,8 +83,23 @@ func _ready() -> void:
 	for id: String in LaunchArgs.PROFILES:
 		var j := HubJarling.new()
 		add_child(j)
-		j.setup(MODELS[id], id, Players.COLOR[jarlings.size()])
+		j.setup(MODELS[id], id, Players.COLOR[jarlings.size()], SIZES[id])
 		jarlings.append(j)
+	for r: Array in RESIDENTS:
+		var j := HubJarling.new()
+		add_child(j)
+		j.setup(r[0], "", Color.WHITE)
+		j.set_held(false)
+		j.position = r[1]
+		j.rotation.y = atan2(-j.position.x, 6.0)
+		residents.append(j)
+	var layer := CanvasLayer.new()
+	add_child(layer)
+	_flash = ColorRect.new()   # the launch ends in a flash of the jar's colour
+	_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_flash.color = Color(1, 1, 1, 0)
+	layer.add_child(_flash)
 	root_dir = ManifestScanner.default_root()
 	profile = LauncherState.profile(Save)
 	two_players = Players.is_active(Players.P2)
@@ -117,6 +148,7 @@ func _rescan(select_slug: String) -> void:
 
 ## Rebuilds the row of jars and stands the Jarlings at `select_slug`'s jar (the middle one if unknown).
 func set_entries(list: Array[Dictionary], select_slug: String = "") -> void:
+	launch.cancel()
 	for s in spots:
 		spot_root.remove_child(s)
 		s.queue_free()
@@ -124,13 +156,12 @@ func set_entries(list: Array[Dictionary], select_slug: String = "") -> void:
 	entries = list
 	var count := HubLayout.spot_count(list.size())
 	var selected := (count - 1) / 2
-	var previous_toy := -1
+	var kinds := JarWorld.assign(list.map(func(e: Dictionary) -> String: return e.slug))
 	for i in count:
 		var spot := GameSpot.new()
 		spot_root.add_child(spot)
-		spot.setup(list[i] if i < list.size() else {}, i, previous_toy)
+		spot.setup(list[i] if i < list.size() else {}, i, kinds[i] if i < kinds.size() else -1)
 		spot.place(HubLayout.jar_position(i, count), HubLayout.stand_position(i, count))
-		previous_toy = spot.toy_index
 		spots.append(spot)
 		if not select_slug.is_empty() and spot.entry.get("slug", "") == select_slug:
 			selected = i
@@ -159,25 +190,25 @@ func index_of_profile(id: String) -> int:
 	return maxi(LaunchArgs.PROFILES.find(id), 0)
 
 
-## The Jarling the camera favours: the picked one in solo play, Jeff when both are held.
+## Player 1's Jarling (the picked profile); the camera favours it.
 func lead_jarling() -> HubJarling:
-	return jarlings[0] if two_players else jarlings[index_of_profile(profile)]
+	return jarlings[index_of_profile(profile)]
 
 
-## Solo: the one controller holds the picked Jarling and the other tags along.
-## Two players: P1 always holds Jeff (green), P2 always holds Chuck (red).
+## Player 1 holds the picked Jarling. The other one tags along until player 2 joins and takes it.
 func jarling_for(player: int) -> HubJarling:
-	if two_players:
-		return jarlings[player]
-	return lead_jarling() if player == Players.P1 else null
+	if player == Players.P1:
+		return lead_jarling()
+	return jarlings[1 - index_of_profile(profile)] if two_players else null
 
 
+## Rings are by player, not by Jarling: player 1 green, player 2 red.
 func _apply_roles() -> void:
 	var lead := lead_jarling()
 	for j in jarlings:
 		var held := two_players or j == lead
 		j.follow = null if held else lead
-		j.set_held(held)
+		j.set_held(held, Players.COLOR[Players.P1 if j == lead else Players.P2])
 		if not held:
 			j.move_input = Vector2.ZERO
 			j.hop_goal = Vector3.INF
@@ -194,18 +225,19 @@ func _on_player_left(player: int) -> void:
 		_apply_roles()
 
 
-## P2 drops in (second pad, or the P2 keys): takes Chuck, wherever he is.
+## P2 drops in (second pad, or the P2 keys): takes the tag-along Jarling, wherever it is.
 func join_second_player() -> void:
 	if two_players:
 		return
 	two_players = true
 	_apply_roles()
-	jarlings[1].cheer()
+	jarling_for(Players.P2).cheer()
+	residents[1].cheer()
 
 
 ## Solo profile pick: B swaps which Jarling you are. The pick is remembered.
 func pick_profile(id: String) -> void:
-	if two_players or not id in LaunchArgs.PROFILES or id == profile:
+	if two_players or launch.active or not id in LaunchArgs.PROFILES or id == profile:
 		return
 	profile = id
 	LauncherState.set_profile(Save, id)
@@ -219,7 +251,7 @@ func pick_profile(id: String) -> void:
 ## Sideways push: run straight to the next jar that way. At the end of the row the jar just wobbles.
 func hop(player: int, dir: int) -> void:
 	var j := jarling_for(player)
-	if j == null or j.busy:
+	if j == null or j.busy or launch.active:
 		return
 	var ji := jarlings.find(j)
 	var from: int = _hop_index[ji] if j.hop_goal != Vector3.INF else focus[ji]
@@ -235,10 +267,14 @@ func hop(player: int, dir: int) -> void:
 func _process(delta: float) -> void:
 	_clock += delta
 	_run_demo()
-	if screen == Screen.HUB and not _launching and Time.get_ticks_msec() >= _input_from_ms:
+	if screen == Screen.HUB and not launch.active and Time.get_ticks_msec() >= _input_from_ms:
 		_read_players(delta)
 		if _dev_combo.update(Input.is_action_pressed("launcher_lb"), Input.is_action_pressed("launcher_rb"), delta):
 			_toggle_dev()
+	if launch.active:
+		for beat in launch.advance(delta):
+			_on_launch_beat(beat)
+		_pose_launch()
 	_update_focus()
 	_update_camera(delta)
 	for n in get_tree().get_nodes_in_group("hub_bob"):
@@ -286,10 +322,11 @@ func _same_key_as_p1(action_name: String) -> bool:
 	return Input.is_action_pressed(Players.action(Players.P1, action_name))
 
 
-## A: at a jar, jump in and play. At the empty jar, it wobbles. Anywhere else, a happy little cheer.
+## A: at a jar, the launch animation, then the game. At the empty jar, it wobbles. Anywhere else, a
+## happy little cheer. Ignored while a launch is playing, so A spam never launches twice.
 func press_action(player: int) -> void:
 	var j := jarling_for(player)
-	if j == null or j.busy or _launching:
+	if j == null or j.busy or launch.active or screen != Screen.HUB:
 		return
 	var f: int = focus[jarlings.find(j)]
 	if f < 0:
@@ -319,6 +356,8 @@ func _update_focus(silent: bool = false) -> void:
 		if f >= 0 and not colors.has(f):
 			colors[f] = j.color
 		j.face_point = spots[f].position if f >= 0 else Vector3(j.position.x * 0.6, 0, 40)
+	for r in residents:   # Jeff and Chuck watch whoever is playing
+		r.face_point = lead_jarling().global_position if lead_jarling().visible else Vector3(0, 0, 40)
 	for i in spots.size():
 		spots[i].set_highlighted(colors.has(i), colors.get(i, Color.WHITE))
 
@@ -338,29 +377,86 @@ func _toggle_dev() -> void:
 	print("launcher: dev builds %s" % ("shown" if on else "hidden"))
 
 
+## A at a jar: remember the pick and start the launch animation. The game itself starts on its GO beat.
 func _launch(spot: GameSpot, j: HubJarling) -> void:
+	if not launch.start():
+		return
 	var entry := spot.entry
-	var cmd := LaunchArgs.build(entry, j.profile_id)
+	_launch_cmd = LaunchArgs.build(entry, j.profile_id)
 	LauncherState.set_last_card(Save, entry.slug)
-	LauncherState.set_profile(Save, j.profile_id)   # whoever jumps in is the profile that plays
 	if not two_players:
 		profile = j.profile_id
+	LauncherState.set_profile(Save, profile)
 	Save.flush()
-	_launching = true
 	_launcher_index = jarlings.find(j)
+	_launch_spot = spot
+	_launch_from = j.global_position
+	_launch_cam = [_cam_pos, _cam_look]
+	# if nobody is near enough to wear it, the lid lands on the plaza beside the jar
+	_lid_ground = spot.stand_point + spot.global_basis.x * 2.3 + Vector3(0, 0.02, 0)
+	_flash.color = Color(spot.accent.lerp(Color.WHITE, 0.6), 0.0)
+	for other in jarlings:
+		other.move_input = Vector2.ZERO
 	if not entry.binary.is_empty():
 		_ensure_executable(entry.binary)
-	Audio.play("launch")
-	spot.launch_flash()
-	await j.jump_into(spot.mouth_position()).finished
-	print("launcher: starting %s %s" % [cmd.path, " ".join(cmd.args)])
-	var pid := OS.create_process(cmd.path, cmd.args) if not cmd.path.is_empty() else -1
-	_launching = false
+
+
+## One sound per beat, and the things that happen once. Everything else is posed from launch.t.
+func _on_launch_beat(beat: int) -> void:
+	var j := jarlings[_launcher_index]
+	var friend := jarlings[1 - _launcher_index]
+	match beat:
+		LaunchSequence.Beat.RATTLE:
+			Audio.play("jar_rattle")
+			j.set_expression("determined")
+		LaunchSequence.Beat.LID_POP:
+			Audio.play("intro_pop")
+			j.set_expression("surprised")
+		LaunchSequence.Beat.LEAP:
+			Audio.play("jarling_jump")
+			j.set_expression("happy")
+		LaunchSequence.Beat.LID_LAND:
+			Audio.play("lid_land")
+			if _lid_lands_on(friend):
+				friend.set_expression("surprised")
+				friend._squash()
+		LaunchSequence.Beat.SPLASH:
+			Audio.play("jar_splash")
+			_launch_spot.splash()
+		LaunchSequence.Beat.DIVE:
+			Audio.play("launch")
+			for r in residents:
+				r.cheer(1.2)
+		LaunchSequence.Beat.GO:
+			_start_game()
+
+
+func _lid_lands_on(friend: HubJarling) -> bool:
+	return friend.visible and not friend.busy and friend.global_position.distance_to(_launch_spot.global_position) < 6.5
+
+
+func _pose_launch() -> void:
+	var j := jarlings[_launcher_index]
+	var friend := jarlings[1 - _launcher_index]
+	var t := launch.t
+	var lid_to := friend.head_top() - Vector3(0, 0.12, 0) if _lid_lands_on(friend) else _lid_ground
+	_launch_spot.launch_pose(t, lid_to)
+	j.launch_pose(t, _launch_from, _launch_spot.mouth_position(), _launch_spot.inside_position())
+	_flash.color.a = LaunchSequence.smooth(LaunchSequence.phase(t, LaunchSequence.T_GO - 0.18, LaunchSequence.T_GO))
+
+
+## The GO beat: the animation is over, hand the TV to the game.
+func _start_game() -> void:
+	var entry := _launch_spot.entry
+	var j := jarlings[_launcher_index]
+	_dived = true
+	_flash.color.a = 1.0
+	print("launcher: starting %s %s" % [_launch_cmd.path, " ".join(_launch_cmd.args)])
+	var pid := OS.create_process(_launch_cmd.path, _launch_cmd.args) if not _launch_cmd.path.is_empty() else -1
 	if pid <= 0:
-		push_warning("launcher: could not start %s" % cmd.path)
+		push_warning("launcher: could not start %s" % _launch_cmd.path)
 		Audio.play("ui_back")
-		spot.wobble()
-		j.jump_out(spot.mouth_position(), spot.stand_point)
+		_play_return(j)
 		return
 	_pid = pid
 	_running_slug = entry.slug
@@ -376,15 +472,27 @@ func _on_process_watch() -> void:
 	_rescan(_running_slug)   # pick up games installed or updated meanwhile
 	_set_screen(Screen.HUB)
 	_input_from_ms = Time.get_ticks_msec() + RETURN_GRACE_MS
-	var j := jarlings[_launcher_index]
+	_play_return(jarlings[_launcher_index])
+
+
+## Back in the hub: the flash clears, the Jarling pops out of its jar and the lid drops back on.
+func _play_return(j: HubJarling) -> void:
+	_dived = false
+	_cam_snap = true
+	create_tween().tween_property(_flash, "color:a", 0.0, 0.35)
+	for other in jarlings:
+		other.set_expression("neutral")
 	var f := HubLayout.focus_at(lead_jarling().position, spots.size())
+	if f < 0 and _launch_spot != null and is_instance_valid(_launch_spot):
+		f = spots.find(_launch_spot)
 	if f >= 0:
 		var spot := spots[f]
-		j.jump_out(spot.mouth_position(), spot.stand_point if j == lead_jarling() else j.position)
-		spot.bounce()
+		Audio.play("jar_pop_out")
+		spot.splash()
+		spot.drop_lid(0.5)
+		j.jump_out(spot.mouth_position(), spot.stand_point if j == lead_jarling() else _launch_from)
 	else:
-		j.visible = true
-		j.busy = false
+		j.jump_out(j.global_position, j.global_position)
 
 
 ## While a game runs: hidden, no input, ~10 fps, and minimised if MINIMIZE_WHILE_RUNNING.
@@ -395,7 +503,7 @@ func _set_screen(to: Screen) -> void:
 	if running != was_running:
 		_apply_window_policy(running)
 	visible = not running
-	for n: Node in [world, spot_root] + jarlings:
+	for n: Node in [world, spot_root] + jarlings + residents:
 		n.process_mode = Node.PROCESS_MODE_DISABLED if running else Node.PROCESS_MODE_INHERIT
 	OS.low_processor_usage_mode = running
 	OS.low_processor_usage_mode_sleep_usec = IDLE_SLEEP_USEC if running else 6900
@@ -431,6 +539,9 @@ static func _ensure_executable(path: String) -> void:
 
 ## One camera, never loses a player: it frames the held Jarlings and leans towards the jar in focus.
 func _update_camera(delta: float) -> void:
+	if launch.active or _dived:
+		_launch_camera()
+		return
 	if not _intro_hold:
 		_intro = minf(_intro + delta / INTRO_SECONDS, 1.0)
 	var centre := Vector3.ZERO
@@ -454,11 +565,35 @@ func _update_camera(delta: float) -> void:
 	var k := smoothstep(0.0, 1.0, _intro)
 	want = Vector3(0, 10.5, 27).lerp(want, k)
 	look = Vector3(0, 1.5, -3).lerp(look, k)
-	var ease := 1.0 if delta <= 0.0 else 1.0 - exp(-delta * 4.5)
+	var ease := 1.0 if delta <= 0.0 or _cam_snap else 1.0 - exp(-delta * 4.5)
+	_cam_snap = false
 	_cam_pos = _cam_pos.lerp(want, ease)
 	_cam_look = _cam_look.lerp(look, ease)
 	camera.fov = lerpf(52.0, 46.0, k)
 	camera.look_at_from_position(_cam_pos, _cam_look)
+
+
+## The launch shot: lean in while the jar rattles, look up after the lid and the leap, then dive
+## through the glass into the jar's tiny world until it fills the screen.
+func _launch_camera() -> void:
+	var L := LaunchSequence
+	var t := launch.t
+	var spot := _launch_spot
+	var jar := spot.global_position
+	var lean := L.smooth(L.phase(t, 0.0, L.T_POP))
+	var pos: Vector3 = _launch_cam[0].lerp(jar + Vector3(0, 2.0, 0), 0.1 * lean)
+	var look: Vector3 = _launch_cam[1].lerp(jar + Vector3(0, 2.3, 0), 0.7 * lean)
+	look.y += 1.5 * sin(PI * L.phase(t, L.T_POP, L.T_DIVE))
+	pos.y += 0.5 * sin(PI * L.phase(t, L.T_POP, L.T_DIVE))
+	# The dive: up over the rim after the Jarling and down through the jar mouth, until the tiny
+	# world fills the screen.
+	var d := L.smooth(L.phase(t, L.T_DIVE - 0.15, L.T_GO))
+	var out := ((_launch_cam[0] - jar) * Vector3(1, 0, 1)).normalized()
+	var target := jar + Vector3(0, GameSpot.PLINTH_HEIGHT + 0.5, 0)
+	var over := jar + out * 0.9 + Vector3(0, GameSpot.PLINTH_HEIGHT + GameSpot.JAR_HEIGHT + 1.7, 0)
+	var end_pos := jar + out * 0.45 + Vector3(0, GameSpot.PLINTH_HEIGHT + 1.75, 0)
+	camera.fov = lerpf(46.0, 62.0, d)
+	camera.look_at_from_position(pos.lerp(over, d).lerp(over.lerp(end_pos, d), d), look.lerp(target, minf(d * 1.6, 1.0)))
 
 
 func _build_sky_and_lights() -> void:
@@ -542,6 +677,10 @@ func _run_demo() -> void:
 				_apply_roles()
 				set_entries(entries, LauncherState.last_card(Save))
 			"a": press_action(Players.P1)
+			"slow": Engine.time_scale = float(d[2])   # slow motion, for frame strips of the launch
+			"return":   # the return animation without running a game
+				jarlings[_launcher_index].visible = false
+				_play_return(jarlings[_launcher_index])
 			"swap": pick_profile(LaunchArgs.PROFILES[1 - index_of_profile(profile)])
 			"walk":
 				_demo_move = Vector2(float(d[2]), float(d[3]))

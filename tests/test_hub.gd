@@ -114,12 +114,37 @@ func test_spots_built_from_0_1_2_8_manifests() -> void:
 		remove_child(hub)
 
 
-func test_eight_jars_are_sorted_and_show_art_or_a_toy() -> void:
+func test_eight_jars_are_sorted_and_each_holds_a_tiny_world() -> void:
 	var hub := await _hub(_fixture(8))
 	var slugs: Array = hub.spots.map(func(s: GameSpot) -> String: return s.entry.slug)
 	assert_array(slugs).is_equal(["ball-bash", "bubble-pop", "comet-kick", "dino-dash", "jelly-jump", "moon-golf", "no-art-yet", "smash-party"])
-	for s: GameSpot in hub.spots:
-		assert_bool(s.toy_index >= 0).is_equal(s.entry.slug == "no-art-yet")
+	for i in hub.spots.size():
+		var s: GameSpot = hub.spots[i]
+		# moon-golf ships its own jar world ("jar" in its manifest); the rest get a generated one
+		assert_bool(s.custom_world).is_equal(s.entry.slug == "moon-golf")
+		if s.custom_world:
+			assert_int(s.world_kind).is_equal(-1)
+		else:
+			assert_int(s.world_kind).is_between(0, JarWorld.KINDS - 1)
+		if i > 0:                                         # neighbours never look the same
+			assert_int(s.world_kind).is_not_equal(hub.spots[i - 1].world_kind)
+		assert_bool(s._inside.find_children("*", "MeshInstance3D", true, false).size() >= 3).is_true()
+		assert_array(s.find_children("*", "Label3D", true, false)).is_empty()
+
+
+func test_profile_jarlings_are_generic_and_jeff_and_chuck_are_residents() -> void:
+	var hub := await _hub(_fixture(2))
+	assert_int(hub.jarlings.size()).is_equal(2)
+	assert_str(hub.jarlings[0].profile_id).is_equal("p1")
+	assert_str(hub.jarlings[1].profile_id).is_equal("p2")
+	assert_bool(hub.jarlings[1].height < hub.jarlings[0].height).is_true()   # a grown-up and a kid
+	assert_int(hub.residents.size()).is_equal(2)
+	for r: HubJarling in hub.residents:
+		assert_bool(hub.jarlings.has(r)).is_false()       # never held, never a profile
+		assert_bool(r._ring.visible).is_false()
+	# Jeff (P1's) stands on the left, Chuck (P2's) on the right
+	assert_bool(hub.residents[0].position.x < 0.0).is_true()
+	assert_bool(hub.residents[1].position.x > 0.0).is_true()
 
 
 func test_empty_hub_a_wobbles_and_never_launches() -> void:
@@ -127,7 +152,7 @@ func test_empty_hub_a_wobbles_and_never_launches() -> void:
 	hub.press_action(Players.P1)
 	await _wait(0.2)
 	assert_int(hub.screen).is_equal(hub.Screen.HUB)
-	assert_bool(hub._launching).is_false()
+	assert_bool(hub.launch.active).is_false()
 
 
 func test_remembered_jar_is_where_you_start() -> void:
@@ -166,9 +191,23 @@ func test_launch_hand_off_return_and_profile_pick() -> void:
 	await _wait(0.5)
 	assert_str(hub.selected_entry().slug).is_equal("b-game")
 
+	var fired := [0]
+	hub.launched.connect(func(_slug: String, _profile: String) -> void: fired[0] += 1)
 	await _tap("p1_action")
-	await _wait_for_screen(hub, hub.Screen.RUNNING, 3.0)
+	assert_bool(hub.launch.active).is_true()
+	for i in 6:                                        # A spam while the lid spins off
+		await _tap("p1_action", 0.05)
+		hub.press_action(Players.P1)
+	# the game only starts on the animation's last beat
+	assert_bool(hub.launch.active).is_true()
+	assert_bool(hub.launch.t < LaunchSequence.T_GO).is_true()
+	assert_int(hub.screen).is_equal(hub.Screen.HUB)
+	assert_int(fired[0]).is_equal(0)
+	assert_bool(FileAccess.file_exists(log_path)).is_false()
+	await _wait_for_screen(hub, hub.Screen.RUNNING, 4.0)
 	assert_int(hub.screen).is_equal(hub.Screen.RUNNING)
+	assert_bool(hub.launch.active).is_false()
+	assert_int(fired[0]).is_equal(1)
 	assert_bool(hub.visible).is_false()
 	await _push("p1_move_left")                        # ignored while the game runs
 	await _wait_for_screen(hub, hub.Screen.HUB, 5.0)
@@ -176,20 +215,24 @@ func test_launch_hand_off_return_and_profile_pick() -> void:
 	assert_bool(hub.visible).is_true()
 	assert_str(hub.selected_entry().slug).is_equal("b-game")
 	assert_str(LauncherState.last_card(Save)).is_equal("b-game")
+	# one line: the spam did not start it twice
 	assert_str(FileAccess.get_file_as_string(log_path).strip_edges()).is_equal("b-game --profile=p1 --from-test")
 
-	await _wait(1.4)                                   # return grace + the jump back out
+	await _wait(1.8)                                   # return grace, the jump back out, the lid bonk
 	assert_bool(hub.jarlings[0].visible).is_true()
+	assert_bool(hub.jarlings[0].busy).is_false()
+	assert_float(hub.spots[1]._lid.position.y).is_less(GameSpot.LID_REST + 2.0)   # the lid is back on
+	assert_int(fired[0]).is_equal(1)
 	await _tap("p1_jump")                              # B: be the other Jarling
 	assert_str(hub.profile).is_equal("p2")
 	assert_str(LauncherState.profile(Save)).is_equal("p2")
 	assert_object(hub.lead_jarling()).is_same(hub.jarlings[1])
 	assert_object(hub.jarlings[0].follow).is_same(hub.jarlings[1])
 	await _wait(0.2)
-	hub.hop(Players.P1, 1)                            # Chuck runs up to the same jar
+	hub.hop(Players.P1, 1)                            # the kid runs up to the same jar
 	await _wait(0.6)
 	await _tap("p1_action")
-	await _wait_for_screen(hub, hub.Screen.RUNNING, 3.0)
+	await _wait_for_screen(hub, hub.Screen.RUNNING, 4.0)
 	await _wait_for_screen(hub, hub.Screen.HUB, 5.0)
 	var lines := FileAccess.get_file_as_string(log_path).strip_edges().split("\n")
 	assert_str(lines[lines.size() - 1]).is_equal("b-game --profile=p2 --from-test")
@@ -203,14 +246,16 @@ func test_picked_jarling_is_remembered() -> void:
 	assert_object(hub.jarling_for(Players.P2)).is_null()
 
 
-func test_second_player_takes_chuck_and_p1_is_jeff() -> void:
+func test_second_player_takes_the_other_jarling_and_rings_are_by_player() -> void:
 	LauncherState.set_profile(Save, "p2")
 	var hub := await _hub(_fixture(2))
 	hub.join_second_player()
-	assert_object(hub.jarling_for(Players.P1)).is_same(hub.jarlings[0])
-	assert_object(hub.jarling_for(Players.P2)).is_same(hub.jarlings[1])
-	assert_that(hub.jarlings[0].color).is_equal(Players.COLOR[Players.P1])
-	assert_that(hub.jarlings[1].color).is_equal(Players.COLOR[Players.P2])
+	# P1 keeps the Jarling they picked (the kid), P2 gets the other one; green is P1, red is P2
+	assert_object(hub.jarling_for(Players.P1)).is_same(hub.jarlings[1])
+	assert_object(hub.jarling_for(Players.P2)).is_same(hub.jarlings[0])
+	assert_that(hub.jarlings[1].color).is_equal(Players.COLOR[Players.P1])
+	assert_that(hub.jarlings[0].color).is_equal(Players.COLOR[Players.P2])
 	assert_object(hub.jarlings[0].follow).is_null()
+	assert_object(hub.jarlings[1].follow).is_null()
 	hub.pick_profile("p1")                            # no swapping once both are held
 	assert_str(hub.profile).is_equal("p2")

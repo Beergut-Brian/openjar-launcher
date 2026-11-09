@@ -1,6 +1,7 @@
-## One installed game in the hub: a giant glass jar on a plinth with the game's card glowing inside.
-## A game without card art gets a bright toy shape instead; an empty hub gets one sleepy empty jar.
+## One installed game in the hub: a giant glass jar on a plinth with a tiny world inside (JarWorld):
+## the game's own `jar` scene, or a generated diorama in the game's colours. 0 games: one sleepy jar.
 ## When a Jarling stands in front, the lid lifts, light pours out and the pad takes that player's colour.
+## On launch the hub poses the jar and its lid from the LaunchSequence clock (launch_pose).
 class_name GameSpot
 extends Node3D
 
@@ -11,7 +12,8 @@ const JAR_RADIUS := 1.05
 const PLINTH_HEIGHT := 0.3
 const LID_REST := PLINTH_HEIGHT + JAR_HEIGHT + 0.06
 const LID_LIFT := 0.75
-const TOY_COUNT := 5
+const WORLD_SCALE := 1.05    # generated and fitted worlds are authored for a slightly smaller jar
+const LID_HAT_SCALE := 0.62   # the flown-off lid shrinks a little so it sits on a Jarling like a hat
 const DEV_LID := Color("3a3f5c")
 ## Bright jar colours for games without art, picked by slug so a game keeps its colour.
 const TOY_COLORS := [Color("ffd23f"), Color("35b6ff"), Color("ff7ac8"), Color("5ef0c0"), Color("ff8a3d"), Color("a78bff")]
@@ -20,7 +22,8 @@ var entry: Dictionary = {}
 var empty := true
 var index := 0
 var accent := Color("8fe3ff")
-var toy_index := -1            # 0..TOY_COUNT-1 when the jar shows a toy shape, -1 when it shows card art
+var custom_world := false      # the game shipped its own jar world and it loaded
+var world_kind := -1           # JarWorld.Kind of the generated world, -1 for a custom or empty jar
 var highlighted := false
 var stand_point := Vector3.ZERO   # global, where a Jarling stands
 
@@ -33,26 +36,37 @@ var _light: OmniLight3D
 var _pad: MeshInstance3D
 var _pad_mat: StandardMaterial3D
 var _lit := 0.0
+var _lit_boost := 0.0       # extra glow asked for by the launch pose
+var _calm := 0.0            # 0..1: the glow settles as the camera dives in, so the tiny world is not washed out
+var _posed := false         # the hub is posing jar and lid (launch), or the lid is dropping back on
+var _sparkles: CPUParticles3D
 var _clock := 0.0
 var _tween: Tween
+
+var _bobbers: Array[Node3D] = []
 
 static var _jar_mesh: ArrayMesh
 
 
-func setup(e: Dictionary, i: int = 0, previous_toy: int = -1) -> void:
+## `kind` is the generated world to use if the game ships none (JarWorld.assign keeps neighbours apart).
+func setup(e: Dictionary, i: int = 0, kind: int = -1) -> void:
 	entry = e
 	empty = e.is_empty()
 	index = i
 	var art: Texture2D = null
-	if not empty:
+	var world: Node3D = null
+	if empty:
+		world = JarWorld.build_sleepy()
+	else:
 		art = _load_art(e.get("grid", ""))
-		var h: int = absi(String(e.get("slug", "")).hash())
-		if art == null:
-			toy_index = h % TOY_COUNT
-			if toy_index == previous_toy:
-				toy_index = (toy_index + 1) % TOY_COUNT
-			accent = TOY_COLORS[h % TOY_COLORS.size()]
-	_build(art)
+		var slug := String(e.get("slug", ""))
+		accent = accent_from(art) if art != null else TOY_COLORS[absi(slug.hash()) % TOY_COLORS.size()]
+		world = JarWorld.load_custom(e.get("jar", ""))
+		custom_world = world != null
+		if world == null:
+			world_kind = kind if kind >= 0 else JarWorld.kind_for(slug)
+			world = JarWorld.build(world_kind, accent)
+	_build(world, null if custom_world else art)
 	_clock = i * 1.7
 
 
@@ -69,11 +83,14 @@ func set_highlighted(on: bool, color: Color = Color.WHITE) -> void:
 
 ## Squash, stretch, settle: the jar noticed you.
 func bounce() -> void:
-	_squash([Vector3(1.14, 0.84, 1.14), Vector3(0.93, 1.12, 0.93), Vector3.ONE], [0.09, 0.12, 0.2])
+	if not _posed:
+		_squash([Vector3(1.14, 0.84, 1.14), Vector3(0.93, 1.12, 0.93), Vector3.ONE], [0.09, 0.12, 0.2])
 
 
 ## "Nothing in here": a side-to-side shake with a little squash.
 func wobble() -> void:
+	if _posed:
+		return
 	if _tween:
 		_tween.kill()
 	_tween = create_tween()
@@ -83,16 +100,83 @@ func wobble() -> void:
 	_tween.parallel().tween_property(_jar, "scale", Vector3.ONE, 0.1)
 
 
-## The launch flourish; await the returned tween's `finished`.
-func launch_flash() -> Tween:
-	_squash([Vector3(1.2, 0.8, 1.2), Vector3(0.88, 1.2, 0.88), Vector3(1.05, 1.05, 1.05)], [0.1, 0.16, 0.5])
-	_lit = 2.2
-	return _tween
+## The launch animation at LaunchSequence time t; the hub calls this every frame of it.
+## Rattle with the lid clamped down, then the lid spins off in an arc to `lid_target` (global) and
+## wobbles to rest there like a dropped coin, the jar stretches, and gulps when the Jarling lands.
+func launch_pose(t: float, lid_target: Vector3) -> void:
+	if _tween:
+		_tween.kill()
+	_posed = true
+	var L := LaunchSequence
+	var build := L.phase(t, 0.0, L.T_POP)
+	var y := 1.0 - 0.1 * build
+	var shake := build * build
+	if t >= L.T_POP:
+		var u := t - L.T_POP
+		y = 1.0 + 0.2 * exp(-u * 6.0) * cos(u * 17.0)
+		shake = exp(-u * 10.0)
+	if t >= L.T_DIVE:
+		var u := t - L.T_DIVE
+		y -= 0.16 * exp(-u * 7.0) * cos(u * 19.0)
+	_jar.scale = Vector3(1.0 / sqrt(y), y, 1.0 / sqrt(y))
+	_jar.rotation.z = sin(t * 46.0) * 0.06 * shake
+	_lit_boost = 1.6 * build + (0.5 if t >= L.T_SPLASH else 0.0)
+	_calm = L.smooth(L.phase(t, L.T_SPLASH, L.T_DIVE + 0.25))
+	if t < L.T_POP:
+		var down := L.smooth(L.phase(t, 0.0, 0.14))
+		var shut := Vector3(0, LID_REST - JAR_HEIGHT * (1.0 - y) + absf(sin(t * 46.0)) * 0.07 * build, 0)
+		_lid.position = _lid.position.lerp(shut, down)
+		_lid.rotation = Vector3(0, 0, lerpf(_lid.rotation.z, sin(t * 52.0) * 0.08 * build, down))
+		_lid.scale = Vector3.ONE
+		return
+	var k := L.phase(t, L.T_POP, L.T_LID_LAND)
+	var p := Vector3(0, LID_REST, 0).lerp(to_local(lid_target), k)
+	p.y += sin(k * PI) * 3.2
+	var rest := maxf(t - L.T_LID_LAND, 0.0)
+	p.y += absf(sin(rest * 15.0)) * 0.22 * exp(-rest * 6.0)
+	_lid.position = p
+	_lid.rotation = Vector3(TAU * 2.0 * k, TAU * k, sin(rest * 21.0) * 0.3 * exp(-rest * 5.0))
+	_lid.scale = Vector3.ONE * lerpf(1.0, LID_HAT_SCALE, k)
 
 
-## Where a Jarling ends up when it jumps in (global).
+## Sparkles out of the jar mouth: a Jarling just went in or came out.
+func splash() -> void:
+	_sparkles.restart()
+	_lit = 3.2
+
+
+## Back from a game: the lid falls out of the sky, spinning, and lands on the jar with a bonk.
+func drop_lid(delay: float = 0.0) -> void:
+	if _tween:
+		_tween.kill()
+	_posed = true
+	_lit_boost = 0.0
+	_calm = 0.0
+	_jar.scale = Vector3.ONE
+	_jar.rotation.z = 0.0
+	_lid.scale = Vector3.ONE
+	_lid.position = Vector3(0, LID_REST + 9.0, 0)
+	_lid.rotation = Vector3(TAU * 1.5, 0, 0)
+	_tween = create_tween()
+	_tween.tween_interval(delay)
+	_tween.tween_property(_lid, "position:y", LID_REST, 0.42).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_tween.parallel().tween_property(_lid, "rotation:x", 0.0, 0.42)
+	_tween.tween_callback(func() -> void:
+		Audio.play("lid_bonk")
+		_lit = 0.0)   # so the lid sits shut for a moment before it lifts again
+	for sc: Vector3 in [Vector3(1.16, 0.8, 1.16), Vector3(0.93, 1.12, 0.93), Vector3.ONE]:
+		_tween.tween_property(_jar, "scale", sc, 0.1).set_trans(Tween.TRANS_SINE)
+	_tween.tween_callback(func() -> void: _posed = false)
+
+
+## The jar's mouth (global): Jarlings go in and come out here.
 func mouth_position() -> Vector3:
-	return global_position + Vector3(0, PLINTH_HEIGHT + JAR_HEIGHT * 0.45, 0)
+	return global_position + Vector3(0, PLINTH_HEIGHT + JAR_HEIGHT, 0)
+
+
+## Where a tiny Jarling stands inside the jar's world (global): front of the floor, a little aside.
+func inside_position() -> Vector3:
+	return to_global(Vector3(0.34, PLINTH_HEIGHT + 0.26, 0.4))
 
 
 func _squash(scales: Array, times: Array) -> void:
@@ -107,19 +191,18 @@ func _squash(scales: Array, times: Array) -> void:
 func _process(delta: float) -> void:
 	_clock += delta
 	var want := 1.0 if highlighted and not empty else 0.0
-	_lit = lerpf(_lit, want, 1.0 - exp(-delta * 9.0))
+	_lit = lerpf(_lit, want + (_lit_boost if _posed else 0.0), 1.0 - exp(-delta * 9.0))
 	var k := clampf(_lit, 0.0, 1.0)
-	_glass.set_shader_parameter("lit", _lit)
-	_beam.set_shader_parameter("strength", _lit * 1.1)
-	_lid.position.y = LID_REST + LID_LIFT * k + sin(_clock * 2.3) * 0.06 * k
-	_lid.rotation.z = -0.3 * k + sin(_clock * 1.7) * 0.05 * k
-	_lid.position.x = 0.35 * k
-	_light.light_energy = (0.25 if empty else 1.5) + _lit * 2.2
-	_inside.position.y = PLINTH_HEIGHT + 1.48 + sin(_clock * 1.1) * 0.07
-	if toy_index >= 0:
-		_inside.rotation.y = _clock * 0.9
-	else:
-		_inside.rotation.y = sin(_clock * 0.6) * 0.22
+	var calm := _calm if _posed else 0.0
+	_glass.set_shader_parameter("lit", _lit * (1.0 - calm))
+	_beam.set_shader_parameter("strength", _lit * 1.1 * (1.0 - calm))
+	if not _posed:
+		_lid.position = Vector3(0.35 * k, LID_REST + LID_LIFT * k + sin(_clock * 2.3) * 0.06 * k, 0)
+		_lid.rotation = Vector3(0, 0, -0.3 * k + sin(_clock * 1.7) * 0.05 * k)
+	_light.light_energy = lerpf((0.25 if empty else 1.2) + _lit * 1.2, 0.7, calm)
+	_inside.rotation.y += delta * (0.2 + 0.5 * k)   # a slow turntable, a bit keener when looked at
+	for b in _bobbers:
+		b.position.y += sin(_clock * TAU / float(b.get_meta("bob"))) * 0.12 * delta
 	_pad.visible = highlighted
 	_pad.scale = Vector3.ONE * (1.0 + sin(_clock * 5.0) * 0.05)
 
@@ -146,9 +229,7 @@ static func accent_from(tex: Texture2D) -> Color:
 	return Color.from_hsv(c.h, clampf(c.s * 1.3 + 0.15, 0.45, 0.85), 1.0)
 
 
-func _build(art: Texture2D) -> void:
-	if art != null:
-		accent = accent_from(art)
+func _build(world: Node3D, art: Texture2D) -> void:
 	var dev: bool = entry.get("dev", false)
 	_mesh(self, _cyl(1.45, 1.6, PLINTH_HEIGHT), _flat(Color("d9c2b0")), Vector3(0, PLINTH_HEIGHT * 0.5, 0))
 	_jar = Node3D.new()
@@ -163,25 +244,25 @@ func _build(art: Texture2D) -> void:
 	# a glowing floor inside the jar
 	_mesh(_jar, _cyl(0.92, 0.92, 0.08), _glow(accent, 1.6), Vector3(0, 0.1, 0))
 
-	_inside = Node3D.new()
-	add_child(_inside)
-	_inside.position.y = PLINTH_HEIGHT + 1.48
-	if art != null:
+	_inside = Node3D.new()   # the turntable the tiny world stands on; squashes with the jar
+	_jar.add_child(_inside)
+	_inside.position.y = 0.16
+	_inside.scale = Vector3.ONE * WORLD_SCALE
+	_inside.add_child(world)
+	for n in world.get_children():
+		if n.has_meta("bob"):
+			_bobbers.append(n)
+	if art != null:   # no jar world from the game: its poster hangs at the back as a small backdrop
 		var card := QuadMesh.new()
-		card.size = Vector2(1.24, 1.86)
+		card.size = Vector2(0.84, 1.26)
 		var m := StandardMaterial3D.new()
 		m.albedo_color = Color.BLACK
 		m.emission_enabled = true
 		m.emission_texture = art
-		m.emission_energy_multiplier = 1.25
+		m.emission_energy_multiplier = 0.9
 		m.cull_mode = BaseMaterial3D.CULL_DISABLED
 		m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
-		_mesh(_inside, card, m, Vector3(0, 0, 0.012))
-		var frame := BoxMesh.new()
-		frame.size = Vector3(1.38, 2.0, 0.02)
-		_mesh(_inside, frame, _glow(Color.WHITE, 0.9), Vector3.ZERO)
-	elif not empty:
-		_mesh(_inside, toy_mesh(toy_index), _glow(accent.lightened(0.15), 1.3), Vector3.ZERO)
+		_mesh(_jar, card, m, Vector3(0, 1.42, -0.62))
 
 	_lid = Node3D.new()
 	add_child(_lid)   # not under _jar: the lid moves on its own while the jar squashes
@@ -192,6 +273,10 @@ func _build(art: Texture2D) -> void:
 	lid_mat.roughness = 0.35
 	_mesh(_lid, _cyl(0.86, 0.86, 0.3), lid_mat, Vector3(0, 0.15, 0))
 	_mesh(_lid, _cyl(0.6, 0.78, 0.1), lid_mat, Vector3(0, 0.34, 0))
+	var knob := SphereMesh.new()   # so a spinning lid reads as spinning
+	knob.radius = 0.17
+	knob.height = 0.26
+	_mesh(_lid, knob, _flat(Color("fff3dc")), Vector3(0, 0.43, 0))
 	if dev:   # dev builds: a dark lid with a little glowing beacon, no text needed
 		_mesh(_lid, _cyl(0.04, 0.04, 0.5), _flat(Color("c9cde0")), Vector3(0, 0.62, 0))
 		var bulb := SphereMesh.new()
@@ -218,6 +303,34 @@ func _build(art: Texture2D) -> void:
 	_light.shadow_enabled = false
 	add_child(_light)
 	_light.position = Vector3(0, PLINTH_HEIGHT + 1.3, 0)
+
+	_sparkles = CPUParticles3D.new()
+	_sparkles.emitting = false
+	_sparkles.one_shot = true
+	_sparkles.amount = 36
+	_sparkles.lifetime = 0.9
+	_sparkles.explosiveness = 0.92
+	_sparkles.direction = Vector3.UP
+	_sparkles.spread = 38.0
+	_sparkles.initial_velocity_min = 3.5
+	_sparkles.initial_velocity_max = 7.0
+	_sparkles.gravity = Vector3(0, -9.0, 0)
+	_sparkles.scale_amount_min = 0.5
+	_sparkles.scale_amount_max = 1.2
+	var fade := Curve.new()
+	fade.add_point(Vector2(0, 1))
+	fade.add_point(Vector2(1, 0))
+	_sparkles.scale_amount_curve = fade
+	var spark := SphereMesh.new()
+	spark.radius = 0.09
+	spark.height = 0.18
+	spark.radial_segments = 8
+	spark.rings = 4
+	spark.material = _glow(accent.lerp(Color.WHITE, 0.55), 3.0)
+	_sparkles.mesh = spark
+	_sparkles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_sparkles)
+	_sparkles.position = Vector3(0, PLINTH_HEIGHT + JAR_HEIGHT, 0)
 
 	var ring := TorusMesh.new()
 	ring.inner_radius = 0.62
@@ -271,33 +384,6 @@ static func _glow(color: Color, energy: float) -> StandardMaterial3D:
 	m.emission = color
 	m.emission_energy_multiplier = energy
 	return m
-
-
-## Big friendly toy shapes for games that have no card art yet.
-static func toy_mesh(i: int) -> Mesh:
-	match i:
-		0:
-			var s := SphereMesh.new()
-			s.radius = 0.62
-			s.height = 1.24
-			return s
-		1:
-			var t := TorusMesh.new()
-			t.inner_radius = 0.3
-			t.outer_radius = 0.68
-			return t
-		2:
-			var p := PrismMesh.new()
-			p.size = Vector3(1.15, 1.1, 0.5)
-			return p
-		3:
-			var b := BoxMesh.new()
-			b.size = Vector3(0.9, 0.9, 0.9)
-			return b
-	var c := CapsuleMesh.new()
-	c.radius = 0.38
-	c.height = 1.3
-	return c
 
 
 ## Jar silhouette spun round the Y axis: straight sides, round shoulder, short neck, lip.
