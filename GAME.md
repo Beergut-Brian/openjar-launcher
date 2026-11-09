@@ -67,6 +67,16 @@ installed (Smash Party via its kiosk shortcut counts), launches one, comes back.
 
 ## Decisions made without Kaden
 - 2026-11-09: launcher reads manifests from disk rather than calling GitHub; keeps it offline-safe.
+- 2026-11-09: intro plays on the first boot of each local day only (date kept in the launcher's
+  Save as `launcher.intro_date`), and A always skips it. This is the proposal from Open questions.
+- 2026-11-09: card row clamps at the ends instead of wrapping; pressing past an end still plays
+  `ui_move` and wobbles the end card, so the input is never silent.
+- 2026-11-09: B on the card row opens the profile picker (B in the picker goes back). That is the
+  only way back to the picker after boot.
+- 2026-11-09: no games installed shows one empty grey card; A on it plays `ui_back` and wobbles.
+- 2026-11-09: Start quits to Steam from every launcher screen (intro, picker, cards), not only
+  the card row. Ignored while a game runs.
+- 2026-11-09: last card is remembered by `slug`, not position, so installs/removals do not shift it.
 
 ## Open questions
 - Logo and jar design: Kaden approves the Art lane's three options.

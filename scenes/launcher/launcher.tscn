@@ -1,0 +1,39 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scenes/launcher/launcher.gd" id="1_launcher"]
+[ext_resource type="PackedScene" path="res://scenes/launcher/intro.tscn" id="2_intro"]
+[ext_resource type="PackedScene" path="res://scenes/launcher/profile_picker.tscn" id="3_picker"]
+[ext_resource type="PackedScene" path="res://scenes/launcher/card_row.tscn" id="4_row"]
+
+[node name="Launcher" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_launcher")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.106, 0.082, 0.188, 1)
+
+[node name="Intro" parent="." instance=ExtResource("2_intro")]
+visible = false
+layout_mode = 1
+
+[node name="ProfilePicker" parent="." instance=ExtResource("3_picker")]
+visible = false
+layout_mode = 1
+
+[node name="CardRow" parent="." instance=ExtResource("4_row")]
+visible = false
+layout_mode = 1
+
+[node name="ProcessWatch" type="Timer" parent="."]
+process_mode = 3

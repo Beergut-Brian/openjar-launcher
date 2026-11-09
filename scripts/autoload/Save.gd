@@ -11,10 +11,20 @@ var _dirty := false
 
 
 func _ready() -> void:
-	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--profile="):
-			profile = arg.trim_prefix("--profile=").strip_edges()
+	profile = profile_from_args(OS.get_cmdline_args() + OS.get_cmdline_user_args(), profile)
 	_load()
+
+
+## The launcher passes --profile=<id> without a "--" separator, so Godot puts it in
+## get_cmdline_args(), not get_cmdline_user_args(); accept it in either.
+static func profile_from_args(args: PackedStringArray, default: String) -> String:
+	var out := default
+	for arg in args:
+		if arg.begins_with("--profile="):
+			var id := arg.trim_prefix("--profile=").strip_edges()
+			if id.is_valid_identifier():   # keeps it a plain file name under user://saves
+				out = id
+	return out
 
 
 func get_value(key: String, default = null):
