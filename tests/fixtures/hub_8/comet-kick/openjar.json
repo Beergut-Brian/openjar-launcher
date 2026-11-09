@@ -1,0 +1,8 @@
+{
+  "slug": "comet-kick",
+  "name": "Comet Kick",
+  "version": "v0.0.1",
+  "binary": "game.sh",
+  "dev": false,
+  "grid": "store/grid.png"
+}

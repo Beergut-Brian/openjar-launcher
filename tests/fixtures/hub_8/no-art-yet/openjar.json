@@ -1,0 +1,7 @@
+{
+  "slug": "no-art-yet",
+  "name": "No Art Yet",
+  "version": "v0.0.1",
+  "binary": "game.sh",
+  "dev": false
+}
