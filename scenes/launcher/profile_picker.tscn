@@ -1,7 +1,12 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=8 format=3]
 
-[ext_resource type="Script" path="res://scripts/launcher/placeholder_shape.gd" id="1_shape"]
-[ext_resource type="Script" path="res://scenes/launcher/profile_picker.gd" id="2_picker"]
+[ext_resource type="Script" path="res://scenes/launcher/profile_picker.gd" id="1"]
+[ext_resource type="Material" path="res://assets/shaders/face_happy.tres" id="2"]
+[ext_resource type="Texture2D" path="res://assets/sprites/launcher/face_a_calm.png" id="3"]
+[ext_resource type="Texture2D" path="res://assets/sprites/launcher/face_a_happy.png" id="4"]
+[ext_resource type="Texture2D" path="res://assets/sprites/launcher/face_b_calm.png" id="5"]
+[ext_resource type="Texture2D" path="res://assets/sprites/launcher/face_b_happy.png" id="6"]
+[ext_resource type="Material" path="res://assets/shaders/face_calm.tres" id="7"]
 
 [node name="ProfilePicker" type="Control"]
 layout_mode = 3
@@ -11,30 +16,62 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-script = ExtResource("2_picker")
+script = ExtResource("1")
 
 [node name="Faces" type="Control" parent="."]
 anchors_preset = 0
 mouse_filter = 2
 
 [node name="FaceP1" type="Control" parent="Faces"]
+anchors_preset = 0
 offset_left = 440.0
 offset_top = 340.0
 offset_right = 840.0
 offset_bottom = 740.0
 pivot_offset = Vector2(200, 200)
 mouse_filter = 2
-script = ExtResource("1_shape")
-kind = 3
-color = Color(0.37, 0.82, 0.71, 1)
+
+[node name="Calm" type="TextureRect" parent="Faces/FaceP1"]
+material = ExtResource("7")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+texture = ExtResource("3")
+expand_mode = 1
+
+[node name="Happy" type="TextureRect" parent="Faces/FaceP1"]
+material = ExtResource("2")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+texture = ExtResource("4")
+expand_mode = 1
 
 [node name="FaceP2" type="Control" parent="Faces"]
+anchors_preset = 0
 offset_left = 1080.0
 offset_top = 340.0
 offset_right = 1480.0
 offset_bottom = 740.0
 pivot_offset = Vector2(200, 200)
 mouse_filter = 2
-script = ExtResource("1_shape")
-kind = 3
-color = Color(0.95, 0.64, 0.23, 1)
+
+[node name="Calm" type="TextureRect" parent="Faces/FaceP2"]
+material = ExtResource("7")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+texture = ExtResource("5")
+expand_mode = 1
+
+[node name="Happy" type="TextureRect" parent="Faces/FaceP2"]
+material = ExtResource("2")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+texture = ExtResource("6")
+expand_mode = 1
