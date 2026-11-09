@@ -1,0 +1,40 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/launcher/placeholder_shape.gd" id="1_shape"]
+[ext_resource type="Script" path="res://scenes/launcher/profile_picker.gd" id="2_picker"]
+
+[node name="ProfilePicker" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2_picker")
+
+[node name="Faces" type="Control" parent="."]
+anchors_preset = 0
+mouse_filter = 2
+
+[node name="FaceP1" type="Control" parent="Faces"]
+offset_left = 440.0
+offset_top = 340.0
+offset_right = 840.0
+offset_bottom = 740.0
+pivot_offset = Vector2(200, 200)
+mouse_filter = 2
+script = ExtResource("1_shape")
+kind = 3
+color = Color(0.37, 0.82, 0.71, 1)
+
+[node name="FaceP2" type="Control" parent="Faces"]
+offset_left = 1080.0
+offset_top = 340.0
+offset_right = 1480.0
+offset_bottom = 740.0
+pivot_offset = Vector2(200, 200)
+mouse_filter = 2
+script = ExtResource("1_shape")
+kind = 3
+color = Color(0.95, 0.64, 0.23, 1)
