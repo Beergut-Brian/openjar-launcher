@@ -1,8 +1,0 @@
-[gd_resource type="ShaderMaterial" load_steps=2 format=3]
-
-[ext_resource type="Shader" path="res://assets/shaders/face_calm.gdshader" id="1_shader"]
-
-[resource]
-shader = ExtResource("1_shader")
-shader_parameter/dim_color = Color(0.5569, 0.6118, 0.7529, 1.0000)
-shader_parameter/dim_amount = 0.5
