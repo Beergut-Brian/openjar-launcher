@@ -132,7 +132,9 @@ def write_readme(rows, fix, path):
 def main():
     rows = checks.all_rows(PALETTES)
     print_table(rows)
-    failed = [r for r in rows if not r[5]]
+    # player.deutan is advisory: the fixed P1/P2 pair is a settled decision (Gary, 2026-11-09).
+    # P1/P2 also differ by lightness and silhouette. Reported, never fails the build.
+    failed = [r for r in rows if not r[5] and r[1] != "player.deutan"]
     if "--check" not in sys.argv:
         import render
         cards = []

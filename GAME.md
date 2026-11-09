@@ -66,6 +66,8 @@ installed (Smash Party via its kiosk shortcut counts), launches one, comes back.
 - Anything a kid has to read.
 
 ## Decisions made without Kaden
+- 2026-11-09: palette check "green vs red under deuteranopia" is advisory, not a gate. The fixed P1/P2 colours are settled; they still differ by lightness and silhouette. Revisit only if a player turns out to be colour-blind.
+- 2026-11-09: dark costume parts (Chuck's hat and shirt) get an inner rim line in the palette's stone colour, since no outline can contrast with near-black.
 - 2026-11-09: launcher reads manifests from disk rather than calling GitHub; keeps it offline-safe.
 
 ## Open questions
