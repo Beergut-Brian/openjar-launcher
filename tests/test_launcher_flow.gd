@@ -27,6 +27,7 @@ func before_test() -> void:
 
 
 func after_test() -> void:
+	Audio.release_all()   # no music left playing when the test run quits
 	Save.wipe()
 	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://saves/%s.json" % PROFILE))
 	Save.profile = _saved_profile

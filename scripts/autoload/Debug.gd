@@ -29,7 +29,7 @@ func _process(delta: float) -> void:
 		_shot_after -= delta
 		if _shot_after < 0.0:
 			await screenshot()
-			get_tree().quit()
+			Audio.quit()
 
 
 func _unhandled_input(event: InputEvent) -> void:

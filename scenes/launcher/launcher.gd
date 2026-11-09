@@ -57,7 +57,7 @@ func quit_to_steam() -> void:
 	Save.flush()
 	set_process_unhandled_input(false)
 	await get_tree().create_timer(0.25).timeout   # let the cue be heard
-	get_tree().quit(0)
+	Audio.quit(0)
 
 
 func _rescan(select_slug: String) -> void:
