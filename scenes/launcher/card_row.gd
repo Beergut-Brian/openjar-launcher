@@ -38,10 +38,12 @@ func set_entries(list: Array[Dictionary], select_slug: String = "") -> void:
 	var shown: Array[Dictionary] = entries.duplicate()
 	if shown.is_empty():
 		shown.append({})   # one empty grey card, so the screen is never blank
-	for e in shown:
+	var tiles := CardLook.spread(shown.map(func(e): return e.get("slug", "")))
+	for i in shown.size():
 		var card := CARD_SCENE.instantiate()
 		track.add_child(card)
-		card.setup(e)
+		card.setup(shown[i])
+		card.set_placeholder_index(tiles[i])   # neighbours never share a fallback tile
 		_cards.append(card)
 	index = 0
 	for i in entries.size():
