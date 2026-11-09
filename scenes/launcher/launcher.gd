@@ -144,6 +144,10 @@ func _set_screen(to: Screen) -> void:
 	visible = not running
 	OS.low_processor_usage_mode = running
 	OS.low_processor_usage_mode_sleep_usec = IDLE_SLEEP_USEC if running else 6900
+	if to == Screen.PICKER or to == Screen.CARDS:
+		Audio.music("card_row_loop")   # no-op if already playing
+	elif running:
+		Audio.stop_music()
 	if running:
 		process_watch.start()
 	else:

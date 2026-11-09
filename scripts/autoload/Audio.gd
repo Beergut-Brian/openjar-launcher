@@ -46,6 +46,8 @@ func music(track: String, fade: float = 0.5) -> void:
 		return
 	if stream is AudioStreamOggVorbis:
 		stream.loop = true
+	if _music.playing and _music.stream == stream:
+		return
 	var tw := create_tween()
 	if _music.playing:
 		tw.tween_property(_music, "volume_db", -40.0, fade)
