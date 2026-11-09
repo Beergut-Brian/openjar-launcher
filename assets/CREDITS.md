@@ -25,3 +25,10 @@ One line per file. Nothing enters `assets/` without a line here.
 | art/palettes/cool_arcade_swatches.png | Pillow script `art/palettes/make_palettes.py` | Master palette candidate sheet, flat-vector shapes drawn in code; original work, no generative model | Original work, Open Jar Games |
 | art/palettes/cool_arcade_card.png | Pillow script `art/palettes/make_palettes.py` | Master palette candidate sheet, flat-vector shapes drawn in code; original work, no generative model | Original work, Open Jar Games |
 | art/palettes/compare.png | Pillow script `art/palettes/make_palettes.py` | Side-by-side of the three candidate cards and palette strips; original work, no generative model | Original work, Open Jar Games |
+| `art/logo/option_a.svg` | hand-built SVG from `art/gen/logos.py` + `letters.py` | logo option A: horizontal lockup, popping jar left; original stroke letters, no font | Original work, Open Jar Games |
+| `art/logo/option_a.png` | Pillow script `art/gen/build.py` | 1200x600 render of option_a.svg shapes | Original work, Open Jar Games |
+| `art/logo/option_b.svg` | hand-built SVG from `art/gen/logos.py` + `letters.py` | logo option B: jar badge with words inside; original stroke letters, no font | Original work, Open Jar Games |
+| `art/logo/option_b.png` | Pillow script `art/gen/build.py` | 1200x600 render of option_b.svg shapes | Original work, Open Jar Games |
+| `art/logo/option_c.svg` | hand-built SVG from `art/gen/logos.py` + `letters.py` | logo option C: arched words over popping jar, banner; original stroke letters, no font | Original work, Open Jar Games |
+| `art/logo/option_c.png` | Pillow script `art/gen/build.py` | 1200x600 render of option_c.svg shapes | Original work, Open Jar Games |
+| `art/logo/compare.png` | Pillow script `art/gen/build.py` | 1920x1080 sheet: A/B/C on sky, on light, at phone/icon size | Original work, Open Jar Games |
