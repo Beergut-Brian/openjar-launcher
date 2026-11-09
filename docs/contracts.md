@@ -86,3 +86,72 @@ The launcher starts a game with `--profile=<id>` and expects the game to:
 ## Game-specific contracts
 
 Add this game's own signals and APIs below. Keep the same format.
+
+## Launcher
+
+The `openjar-launcher` game. Other repos code against this section, not the launcher's code.
+
+### `OPENJAR_ROOT`
+
+Install root the launcher scans on boot. Env var; default `~/Games/openjar`. Every direct
+subfolder holding an `openjar.json` is one card. The launcher's own folders
+(`openjar-launcher`, `openjar-launcher-dev`) are skipped. Folders are sorted by name.
+
+### Manifest: `<OPENJAR_ROOT>/<folder>/openjar.json`
+
+Written by CI (`.github/workflows/release.yml`), or by hand for non-Godot entries.
+All paths are relative to the manifest's folder.
+
+```json
+{ "slug": "smash-party", "name": "Smash Party", "version": "v1.2.0",
+  "binary": "game.x86_64",
+  "command": ["/usr/bin/chromium", "--kiosk", "http://localhost:8080"],
+  "args": ["--fullscreen"],
+  "grid": "store/grid.png", "hero": "store/hero.png", "clip": "store/clip.mp4",
+  "dev": false }
+```
+
+| Key | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `slug` | string | no (defaults to folder name) | stable id; the launcher remembers the last card by slug |
+| `name` | string | no (defaults to slug) | shown only as a small caption on placeholder cards |
+| `version` | string | no | informational |
+| `binary` | string | one of `binary` / `command` | executable, relative to the folder; must exist |
+| `command` | array of strings | one of `binary` / `command` | `[program, arg...]`; `program` is resolved against the folder if that file exists, else used as-is (PATH lookup). Wins over `binary` if both are present |
+| `args` | array of strings | no | extra arguments, appended after `--profile=` |
+| `grid` | string | no | 600x900 card art; missing file → coloured placeholder card |
+| `hero`, `clip` | string | no | 920x430 banner / looping clip (not used by Build 0) |
+| `dev` | bool | no (default `false`) | only shown when the dev toggle is on; gets a corner badge |
+
+A manifest that is not valid JSON, is not an object, has neither a usable `binary` nor
+`command`, or points at a missing `binary`, is skipped with a warning. The launcher never crashes
+on a bad manifest.
+
+### `--profile=<id>` handshake
+
+The launcher starts an entry with `OS.create_process`:
+
+- `binary`: `<folder>/<binary> --profile=<id> <args...>`
+- `command`: `<program> <command[1:]...> --profile=<id> <args...>`
+
+`<id>` is `p1` or `p2` (the two faces in the profile picker; profiles are not players).
+The argument is passed **without** a `--` separator, so a Godot game must look for it in both
+`OS.get_cmdline_args()` and `OS.get_cmdline_user_args()` (`Save.gd` does). The working directory
+is inherited from the launcher; games must not rely on it.
+
+While the game runs the launcher hides, ignores input and idles. When the process exits (any exit
+code) the launcher shows the card row with that card highlighted. Start on the card row quits the
+launcher with exit code 0 (back to Steam).
+
+### Launcher scenes (replaceable by the Art lane, keep file and node names)
+
+| Scene | Root script API |
+| --- | --- |
+| `scenes/launcher/intro.tscn` | `signal finished()`, `func play() -> void`, `func skip() -> void` |
+| `scenes/launcher/profile_picker.tscn` | `signal confirmed(profile_id: String)`, `signal back_requested()`, `func open(selected_id: String) -> void` |
+| `scenes/launcher/card.tscn` | `func setup(entry: Dictionary) -> void`, `func set_highlighted(on: bool) -> void`, `func bounce() -> void` |
+
+### Launcher save keys (launcher's own `Save`, default profile)
+
+`launcher.last_card` (slug), `launcher.profile` (`p1`/`p2`), `launcher.show_dev` (bool),
+`launcher.intro_date` (`YYYY-MM-DD`, local date the intro last played).
