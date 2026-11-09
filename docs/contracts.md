@@ -99,7 +99,7 @@ The `openjar-launcher` game. Other repos code against this section, not the laun
 ### `OPENJAR_ROOT`
 
 Install root the launcher scans on boot. Env var; default `~/Games/openjar`. Every direct
-subfolder holding an `openjar.json` is one card. The launcher's own folders
+subfolder holding an `openjar.json` is one game spot (a jar in the hub). The launcher's own folders
 (`openjar-launcher`, `openjar-launcher-dev`) are skipped. Folders are sorted by name.
 
 ### Manifest: `<OPENJAR_ROOT>/<folder>/openjar.json`
@@ -113,24 +113,50 @@ All paths are relative to the manifest's folder.
   "command": ["/usr/bin/chromium", "--kiosk", "http://localhost:8080"],
   "args": ["--fullscreen"],
   "grid": "store/grid.png", "hero": "store/hero.png", "clip": "store/clip.mp4",
+  "jar": "store/jar.glb",
   "dev": false }
 ```
 
 | Key | Type | Required | Meaning |
 | --- | --- | --- | --- |
-| `slug` | string | no (defaults to folder name) | stable id; the launcher remembers the last card by slug |
-| `name` | string | no (defaults to slug) | shown only as a small caption on placeholder cards |
+| `slug` | string | no (defaults to folder name) | stable id; the launcher remembers the last game by slug |
+| `name` | string | no (defaults to slug) | not shown in the hub (no text); kept for logs and tools |
 | `version` | string | no | informational |
 | `binary` | string | one of `binary` / `command` | executable, relative to the folder; must exist |
 | `command` | array of strings | one of `binary` / `command` | `[program, arg...]`; `program` is resolved against the folder if that file exists, else used as-is (PATH lookup). Wins over `binary` if both are present |
 | `args` | array of strings | no | extra arguments, appended after `--profile=` |
-| `grid` | string | no | 600x900 card art; missing file → coloured placeholder card |
-| `hero`, `clip` | string | no | 920x430 banner / looping clip (not used by Build 0) |
-| `dev` | bool | no (default `false`) | only shown when the dev toggle is on; gets a corner badge |
+| `jar` | string | no | the game's own tiny 3D world, shown inside its jar: a `.glb` / `.gltf` or a self-contained `.tscn` (see "Jar world" below). Missing or unusable → the generated fallback world |
+| `grid` | string | no | 600x900 poster. Only used when there is no `jar`: its average colour tints the fallback world and it hangs as a small backdrop at the back of the jar |
+| `hero`, `clip` | string | no | 920x430 banner / looping clip (not used yet) |
+| `dev` | bool | no (default `false`) | only shown when the dev toggle is on; the jar gets a dark lid with a beacon |
 
 A manifest that is not valid JSON, is not an object, has neither a usable `binary` nor
 `command`, or points at a missing `binary`, is skipped with a warning. The launcher never crashes
 on a bad manifest.
+
+### Jar world: the `jar` field
+
+Every game is a jar on the island with a tiny 3D world inside it (a castle, a planet, a snow
+globe...). A game ships its own world as `store/jar.glb` (preferred) or `store/jar.tscn` and names
+it in the manifest. The launcher loads it at runtime from the install folder.
+
+- **Shape:** Y up, origin at the centre of the floor, front towards +Z. Design it to fit a
+  cylinder of radius 0.8 m and height 1.9 m; the launcher scales any size uniformly to fit that
+  cylinder and stands it on the jar floor. It sits on a slow turntable, so it must read from
+  every side. No text.
+- **Budget:** at most 5,000 triangles, 8 materials, textures 512 px or smaller. The jar adds its
+  own light; unshaded or emissive materials are fine.
+- **Data only:** lights, cameras, audio players and scripts are removed. A `.tscn` must be
+  self-contained (built-in meshes and materials only): one that has an `ext_resource` or a
+  script is rejected. `.glb` has neither problem.
+- **Animation:** if there is an `AnimationPlayer`, its autoplay animation (else `idle`, else the
+  first one) is looped.
+- **Fallback:** no `jar`, or one that fails to load (warning, never a crash) → a world generated
+  by the launcher (`JarWorld`, 8 kinds picked from the slug, neighbours never alike) in the
+  game's colours: the average colour of `grid`, or a colour from the slug when there is no
+  `grid`. No text is generated. 0 games → one sleepy empty jar.
+
+`ManifestScanner` entries gain the key `jar` (absolute path, `""` when absent).
 
 ### `--profile=<id>` handshake
 
@@ -139,37 +165,64 @@ The launcher starts an entry with `OS.create_process`:
 - `binary`: `<folder>/<binary> --profile=<id> <args...>`
 - `command`: `<program> <command[1:]...> --profile=<id> <args...>`
 
-`<id>` is `p1` or `p2` (the two faces in the profile picker; profiles are not players).
+`<id>` is `p1` or `p2`: the save profile of the Jarling that jumped into the jar. The two profile
+Jarlings are generic kit Jarlings: `p1` is the grown-up, `p2` the kid-sized one. In solo play
+that is the Jarling the player picked; with two players it is whoever pressed A. A profile id is
+not a player slot: Jeff (P1, green) and Chuck (P2, red) stay player-locked and only live on the
+island as residents.
 The argument is passed **without** a `--` separator, so a Godot game must look for it in both
 `OS.get_cmdline_args()` and `OS.get_cmdline_user_args()` (`Save.gd` does). The working directory
 is inherited from the launcher; games must not rely on it.
 
 While the game runs the launcher hides, ignores input and idles. With `MINIMIZE_WHILE_RUNNING`
-(const in `launcher.gd`, default `true`) it also minimises its own window, and restores its
+(const in `hub.gd`, default `true`) it also minimises its own window, and restores its
 previous mode (fullscreen) and focus when the game exits. It never changes the game's window. When the process exits (any exit
-code) the launcher shows the card row with that card highlighted. Start on the card row quits the
-launcher with exit code 0 (back to Steam).
+code) the launcher shows the hub again, the Jarling pops back out of that jar and the lid drops back
+on. Start in the hub quits the launcher with exit code 0 (back to Steam).
 
-### Launcher scenes (replaceable by the Art lane, keep file and node names)
+**Launch sequence.** A at a jar does not start the game at once: it starts `LaunchSequence`
+(`scripts/hub/launch_sequence.gd`, pure, about 2.3 s): jar rattles → lid spins off → Jarling
+leaps in → splash → camera dives into the tiny world → `GO`. The process is created and
+`launched` is emitted only on `GO`. While the sequence runs all input is ignored, so pressing A
+again (either player) can never start a second game.
 
-| Scene | Root script API |
-| --- | --- |
-| `scenes/launcher/intro.tscn` | `signal finished()`, `func play() -> void`, `func skip() -> void` |
-| `scenes/launcher/profile_picker.tscn` | `signal confirmed(profile_id: String)`, `signal back_requested()`, `signal picked(profile_id: String)`, `func open(selected_id: String) -> void`, `var picked_id: String` |
-| `scenes/launcher/card.tscn` | `func setup(entry: Dictionary) -> void`, `func set_highlighted(on: bool) -> void`, `func bounce() -> void`, `func wobble() -> void`, `func set_empty(on: bool) -> void`, `func set_placeholder_index(i: int) -> void`, `var empty: bool`, `var placeholder_index: int` |
+### Launcher hub (`scenes/hub/hub.tscn`, root script `scripts/hub/hub.gd`)
 
-Picker: A emits `picked` at once (the face pops and stays happy; `picked_id` is set until the
-next `open()`), then `confirmed` `CardLook.PICK_HOLD` (0.35 s) later. Input is ignored in between.
+The launcher is one 3D scene, the hub: each entry is a jar (`GameSpot`) on an arc, the two
+profile Jarlings (`HubJarling`, `jarlings[0]` grown-up = profile `p1`, `jarlings[1]` kid = profile
+`p2`) walk between them. Jeff and Chuck stand on the island as `residents` (never controlled). Layout maths is pure and lives in `HubLayout` (`scripts/hub/hub_layout.gd`).
 
-Card fallback art (`CardLook`, `scripts/launcher/card_look.gd`): a card without grid art shows
-tile `placeholder_index` (0..4) of `card_tiles.png`, `slug.hash() % 5`, bumped by the card row so
-two neighbours never share a tile. `card.gd` encodes it in the `Placeholder` colour so that
-`card_tiles.gdshader`'s `(r + 2g + 4b) % 5` lands on that index exactly; the empty slot
-(`set_empty(true)`, set by `setup({})`) uses `CardLook.EMPTY_TINT`, the shader's `empty_tint`.
-`bounce()` squashes to `(1.18, 1.06)` then stretches to `(1.08, 1.12)` of the highlight scale
-before settling; `wobble()` adds a small squash to the side-to-side shake.
+```gdscript
+signal launched(slug: String, profile_id: String)
+var entries: Array[Dictionary]        # visible manifest entries, sorted by folder
+var spots: Array[GameSpot]            # one jar per entry; one empty jar when there are none
+var focus: Array[int]                 # per Jarling: index of the jar it stands at, or -1
+var profile: String                   # "p1" / "p2": the Jarling player 1 is
+var two_players: bool
+var launch: LaunchSequence            # launch.active while the launch animation plays
+func set_entries(list: Array[Dictionary], select_slug: String = "") -> void
+func selected_entry() -> Dictionary   # entry of the lead Jarling's jar, {} when roaming
+func hop(player: int, dir: int) -> void          # stick left/right: run to the next jar
+func press_action(player: int) -> void           # A: start the launch sequence / wobble (empty jar) / cheer
+func pick_profile(id: String) -> void            # B in solo play: be the other Jarling
+func join_second_player() -> void                # P2 takes the Jarling player 1 did not pick
+func quit_to_steam() -> void
+```
+
+Input: a mostly-sideways stick push hops to the next jar (repeats while held, stops at the ends);
+any other stick direction walks freely. A at a jar launches it with the profile of the Jarling
+that jumps in. B in solo play swaps Jarling, which is the profile pick, saved at once. Start quits.
+With two players, player 1 (green ring) keeps the picked Jarling and player 2 (red ring) holds the
+other one. Holding LB+RB for 1 s toggles dev entries. `GameSpot` API used by the hub:
+`setup(entry, index, world_kind)`, `place(position, stand_point)`, `set_highlighted(on, color)`,
+`bounce()`, `wobble()`, `launch_pose(t, lid_target)`, `drop_lid()`, `mouth_position()`,
+`inside_position()`, `var empty`, `var custom_world` (true when the game's own `jar` loaded),
+`var world_kind` (`JarWorld.Kind` of the fallback world, -1 otherwise).
+
+`HUB_DEMO` (env, semicolon-separated `time:command[:args]`) drives the hub without a controller
+for `scripts/tools/shots.sh`; see `_run_demo()` in `hub.gd`.
 
 ### Launcher save keys (launcher's own `Save`, default profile)
 
-`launcher.last_card` (slug), `launcher.profile` (`p1`/`p2`), `launcher.show_dev` (bool),
-`launcher.intro_date` (`YYYY-MM-DD`, local date the intro last played).
+`launcher.last_card` (slug), `launcher.profile` (`p1`/`p2`), `launcher.show_dev` (bool).
+`launcher.intro_date` is no longer written (the hub has no separate intro).

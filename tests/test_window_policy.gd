@@ -25,5 +25,5 @@ func test_off_leaves_window_alone() -> void:
 
 
 func test_launcher_default_is_minimise() -> void:
-	var script: GDScript = load("res://scenes/launcher/launcher.gd")
+	var script: GDScript = load("res://scripts/hub/hub.gd")
 	assert_bool(script.MINIMIZE_WHILE_RUNNING).is_true()

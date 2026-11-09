@@ -1,0 +1,8 @@
+{
+  "slug": "dino-dash",
+  "name": "Dino Dash",
+  "version": "v0.0.1",
+  "binary": "game.sh",
+  "dev": false,
+  "grid": "store/grid.png"
+}

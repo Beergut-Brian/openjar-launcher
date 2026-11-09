@@ -66,6 +66,9 @@ installed (Smash Party via its kiosk shortcut counts), launches one, comes back.
 - Anything a kid has to read.
 
 ## Decisions made without Kaden
+- 2026-11-09 (Gary): a game without its own `jar` world keeps its poster as a small card behind the generated diorama, so games stay tell-apart-able until each ships its jar.
+- 2026-11-09 (Gary): the spun-off lid landing on the other Jarling's head is a one-time joke; it's back on the jar when you return.
+- 2026-11-09 (Gary): P1 keeps the profile Jarling they picked, P2 gets the other; the ring colour shows the player (green P1, red P2).
 - 2026-11-09: palette check "green vs red under deuteranopia" is advisory, not a gate. The fixed P1/P2 colours are settled; they still differ by lightness and silhouette. Revisit only if a player turns out to be colour-blind.
 - 2026-11-09: dark costume parts (Chuck's hat and shirt) get an inner rim line in the palette's stone colour, since no outline can contrast with near-black.
 - 2026-11-09: launcher reads manifests from disk rather than calling GitHub; keeps it offline-safe.

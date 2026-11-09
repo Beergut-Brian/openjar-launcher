@@ -56,6 +56,16 @@ func test_good_binary_manifest() -> void:
 	assert_int(e.command.size()).is_equal(0)
 
 
+func test_jar_field_is_optional() -> void:
+	var dir := _game("a-with-jar", {"slug": "a-with-jar", "binary": "game.x86_64", "jar": "store/jar.glb"},
+		["game.x86_64", "store/jar.glb"])
+	_game("b-without-jar", {"slug": "b-without-jar", "binary": "game.x86_64"}, ["game.x86_64"])
+	var entries := ManifestScanner.scan(root)
+	assert_array(_slugs(entries)).is_equal(["a-with-jar", "b-without-jar"])
+	assert_str(entries[0].jar).is_equal(dir.path_join("store/jar.glb"))
+	assert_str(entries[1].jar).is_empty()
+
+
 func test_defaults_from_folder_name() -> void:
 	_game("bare", {"binary": "run"}, ["run"])
 	var e := ManifestScanner.scan(root)[0]

@@ -1,0 +1,56 @@
+{
+  "id": "kid",
+  "name": "Kid (hub profile p2)",
+  "head": {
+    "shape": "pear",
+    "size": 1.05,
+    "ears": "round"
+  },
+  "skin": "#FFE1CC",
+  "face": {
+    "eyes": "lash",
+    "brows": "soft",
+    "nose": "bump",
+    "mouth": "grin_top",
+    "brow_color": "#5C3820",
+    "blush": 0.521467777261174,
+    "freckles": false,
+    "eye_spacing": 0.34054404718401826,
+    "lid": 0
+  },
+  "hair": {
+    "style": "bob",
+    "color": "#7A4B2A"
+  },
+  "headwear": {
+    "type": "beanie",
+    "color": "#FFD23F",
+    "accent": "#F4F4F0"
+  },
+  "body": {
+    "build": "round",
+    "height": 0.9
+  },
+  "outfit": {
+    "top": {
+      "style": "tee",
+      "color": "#9B5DE5",
+      "accent": "#3E7BEA"
+    },
+    "bottoms": {
+      "style": "shorts",
+      "color": "#8A8F99"
+    },
+    "shoes": {
+      "style": "sneaker",
+      "color": "#FF7AB6",
+      "sole": "#F4F4F0"
+    }
+  },
+  "costume": [],
+  "posture": {
+    "spine_lean": 2.446500661075782,
+    "head_lean": -0.8819451521415469,
+    "arm_out": 3.5362582661435833
+  }
+}

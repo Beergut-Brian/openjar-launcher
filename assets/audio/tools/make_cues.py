@@ -442,6 +442,74 @@ def card_row_loop(rng):
     return dc_block(soft(out, 9500.0, circular=True), circular=True)
 
 
+# Hub launch moment. Placeholders from the hub lane: the Audio lane is welcome to replace them.
+TIN = ((1, 1.0, 1.0), (2.32, 0.5, 1.4), (3.9, 0.3, 2.0), (5.4, 0.15, 2.6))
+
+
+def jar_rattle(rng):
+    """The lid rattling on the jar, faster and higher as the pressure builds."""
+    x = silence(0.55)
+    t, k = 0.0, 0
+    while t < 0.48:
+        f = 520.0 * (1.0 + 0.9 * t / 0.48) * (1.0 if k % 2 == 0 else 1.19)
+        mix(x, osc(0.07, f, TIN, decay=0.012, attack=0.0008), t, 0.5 + 0.5 * t / 0.48)
+        t += 0.075 - 0.045 * (t / 0.48)
+        k += 1
+    return fades(svf(x, 6000.0), fade_out=0.03)
+
+
+def jarling_jump(rng):
+    """Slide-whistle "hup!" as the Jarling takes off."""
+    x = silence(0.42)
+    toy = ((1, 1.0, 0.0), (2, 0.25, 0.0), (3, 0.08, 0.0))
+    mix(x, chirp(midi(64), midi(88), 0.36, toy))
+    mix(x, envelope(svf(noise(0.3, rng), 1800.0, 0.8, "band"),
+                    lambda t: 0.12 * math.sin(math.pi * min(1.0, t / 0.3))), 0.03)
+    return fades(svf(x, 5000.0), fade_out=0.04)
+
+
+def lid_land(rng):
+    """The lid lands on somebody's head: tin "tonk" that wobbles like a spun coin."""
+    x = silence(0.6)
+    mix(x, osc(0.5, lambda t: 330.0 * (1.0 + 0.05 * math.exp(-t / 0.2) * math.sin(TAU * (9.0 + 30.0 * t) * t)),
+               TIN, decay=0.11, attack=0.001))
+    mix(x, mallet(rng, 2500.0), 0.0, 0.6)
+    return fades(svf(x, 5500.0), fade_out=0.08)
+
+
+def jar_splash(rng):
+    """Plop into the jar and a splash of sparkles."""
+    x = silence(0.9)
+    mix(x, osc(0.16, lambda t: 240.0 + 520.0 * (1 - math.exp(-t / 0.03)),
+               ((1, 1.0, 1.0), (2, 0.2, 1.5)), decay=0.05, attack=0.001), 0.0, 0.9)
+    for i, n in enumerate((84, 88, 91, 96, 100, 103)):
+        mix(x, struck(midi(n), 0.07, rng, BELL, click=0.05), 0.05 + i * 0.045, 0.2)
+    mix(x, sparkle(rng, 8, 0.25, 0.55, 0.1))
+    return fades(x, fade_out=0.15)
+
+
+def jar_pop_out(rng):
+    """Back from a game: the Jarling pops out of the jar, "boi-oing!"."""
+    x = silence(0.5)
+    mix(x, osc(0.12, lambda t: 300.0 + 500.0 * (1 - math.exp(-t / 0.012)),
+               ((1, 1.0, 1.0), (2, 0.2, 1.5)), decay=0.04, attack=0.0008))
+    toy = ((1, 1.0, 0.0), (2, 0.2, 0.0), (3, 0.1, 0.0))
+    mix(x, chirp(midi(84), midi(72), 0.14, toy), 0.06, 0.6)
+    mix(x, chirp(midi(72), midi(86), 0.2, toy), 0.2, 0.7)
+    return fades(svf(x, 5000.0), fade_out=0.04)
+
+
+def lid_bonk(rng):
+    """The lid drops back on the jar: a round tin BONK with a short boing."""
+    x = silence(0.7)
+    mix(x, osc(0.3, lambda t: 70.0 + 90.0 * math.exp(-t / 0.03),
+               ((1, 1.0, 0.0), (2, 0.5, 0.0)), attack=0.001, amp=lambda t: math.exp(-t / 0.07)))
+    mix(x, osc(0.6, lambda t: 262.0 * (1.0 + 0.1 * math.exp(-t / 0.12) * math.sin(TAU * 11.0 * t)),
+               TIN, decay=0.13, attack=0.001), 0.0, 0.7)
+    mix(x, mallet(rng, 2000.0), 0.0, 0.7)
+    return fades(svf(x, 5500.0), fade_out=0.1)
+
+
 # ---------------------------------------------------------------- registry
 # file stem -> (make, kind, trim dB). kind: "sfx" or "music". Trim lowers frequent cues.
 
@@ -459,6 +527,12 @@ FILES = {
     "round_start": (round_start, "sfx", 0.0),
     "round_end": (round_end, "sfx", 0.0),
     "pause": (pause, "sfx", -2.0),
+    "jar_rattle": (jar_rattle, "sfx", 0.0),
+    "jarling_jump": (jarling_jump, "sfx", 0.0),
+    "lid_land": (lid_land, "sfx", 0.0),
+    "jar_splash": (jar_splash, "sfx", 0.0),
+    "jar_pop_out": (jar_pop_out, "sfx", 0.0),
+    "lid_bonk": (lid_bonk, "sfx", 0.0),
     "card_row_loop": (card_row_loop, "music", 0.0),
 }
 
