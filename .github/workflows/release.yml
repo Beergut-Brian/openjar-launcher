@@ -56,6 +56,7 @@ jobs:
           godot --headless --path . --import || true
           godot --headless --path . --export-release "Linux" build/game.x86_64
       - name: Write launcher manifest
+        shell: bash   # [[ ]] below is bash; the container default sh made every build dev=false
         run: |
           NAME=$(grep -m1 'config/name=' project.godot | sed 's/.*="\(.*\)"/\1/')
           SLUG=${GITHUB_REPOSITORY#*/}
