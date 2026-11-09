@@ -1,11 +1,22 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=15 format=3]
 
+[ext_resource type="Theme" path="res://scenes/ui/theme.tres" id="10_art"]
+[ext_resource type="Texture2D" path="res://assets/sprites/launcher/bg_sky.png" id="11_art"]
+[ext_resource type="Texture2D" path="res://assets/sprites/launcher/bg_clouds.png" id="12_art"]
+[ext_resource type="Texture2D" path="res://assets/sprites/launcher/bg_hills.png" id="13_art"]
+[ext_resource type="Material" path="res://assets/shaders/drift.tres" id="14_art"]
+[ext_resource type="Material" path="res://assets/shaders/bob.tres" id="15_art"]
+[ext_resource type="Texture2D" path="res://assets/sprites/launcher/floater_star.png" id="16_art"]
+[ext_resource type="Texture2D" path="res://assets/sprites/launcher/floater_ball.png" id="17_art"]
+[ext_resource type="Texture2D" path="res://assets/sprites/launcher/floater_triangle.png" id="18_art"]
+[ext_resource type="Texture2D" path="res://assets/sprites/launcher/floater_jar.png" id="19_art"]
 [ext_resource type="Script" path="res://scenes/launcher/launcher.gd" id="1_launcher"]
 [ext_resource type="PackedScene" path="res://scenes/launcher/intro.tscn" id="2_intro"]
 [ext_resource type="PackedScene" path="res://scenes/launcher/profile_picker.tscn" id="3_picker"]
 [ext_resource type="PackedScene" path="res://scenes/launcher/card_row.tscn" id="4_row"]
 
 [node name="Launcher" type="Control"]
+theme = ExtResource("10_art")
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -21,7 +32,68 @@ anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
-color = Color(0.106, 0.082, 0.188, 1)
+color = Color(0.4000, 0.1569, 1.0000, 1.0000)
+
+[node name="Sky" type="TextureRect" parent="Background"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+texture = ExtResource("11_art")
+expand_mode = 1
+
+[node name="Clouds" type="TextureRect" parent="Background"]
+texture_repeat = 2
+material = ExtResource("14_art")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+texture = ExtResource("12_art")
+expand_mode = 1
+
+[node name="Floaters" type="Node2D" parent="Background"]
+
+[node name="Floater1" type="Sprite2D" parent="Background/Floaters"]
+material = ExtResource("15_art")
+position = Vector2(150, 170)
+texture = ExtResource("16_art")
+
+[node name="Floater2" type="Sprite2D" parent="Background/Floaters"]
+material = ExtResource("15_art")
+position = Vector2(430, 105)
+texture = ExtResource("17_art")
+
+[node name="Floater3" type="Sprite2D" parent="Background/Floaters"]
+material = ExtResource("15_art")
+position = Vector2(1500, 120)
+texture = ExtResource("18_art")
+
+[node name="Floater4" type="Sprite2D" parent="Background/Floaters"]
+material = ExtResource("15_art")
+position = Vector2(1790, 205)
+texture = ExtResource("19_art")
+
+[node name="Floater5" type="Sprite2D" parent="Background/Floaters"]
+material = ExtResource("15_art")
+position = Vector2(70, 560)
+texture = ExtResource("17_art")
+
+[node name="Floater6" type="Sprite2D" parent="Background/Floaters"]
+material = ExtResource("15_art")
+position = Vector2(1860, 600)
+texture = ExtResource("16_art")
+
+[node name="Hills" type="TextureRect" parent="Background"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+texture = ExtResource("13_art")
+expand_mode = 1
 
 [node name="Intro" parent="." instance=ExtResource("2_intro")]
 visible = false
