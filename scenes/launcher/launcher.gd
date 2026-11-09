@@ -46,6 +46,14 @@ func _ready() -> void:
 		intro.play()
 	else:
 		_show_picker()
+	_report_cold_start()
+
+
+## Kid-design target: cold start to playing in under 10 s. Ticks count from engine start.
+func _report_cold_start() -> void:
+	await get_tree().process_frame
+	print("launcher: interactive (%s) after %d ms, unix %.3f" % [
+		Screen.keys()[screen], Time.get_ticks_msec(), Time.get_unix_time_from_system()])
 
 
 func _unhandled_input(event: InputEvent) -> void:
