@@ -9,6 +9,9 @@ on:
 env:
   GODOT_VERSION: "4.7.2"   # keep in sync with .godot-version
 
+permissions:
+  contents: write   # the Release step creates releases and uploads the zip
+
 jobs:
   test:
     runs-on: ubuntu-latest
