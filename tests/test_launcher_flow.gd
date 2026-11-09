@@ -81,6 +81,11 @@ func test_pick_launch_return_and_dev_toggle() -> void:
 	assert_int(launcher.picker.index).is_equal(1)    # remembered p2
 
 	await _press("launcher_confirm")
+	assert_int(launcher.screen).is_equal(launcher.Screen.PICKER)   # holding on the happy face
+	assert_str(launcher.picker.picked_id).is_equal("p2")
+	await _press("launcher_left")                                  # ignored during the hold
+	assert_int(launcher.picker.index).is_equal(1)
+	await _wait(CardLook.PICK_HOLD)
 	assert_int(launcher.screen).is_equal(launcher.Screen.CARDS)
 	assert_int(launcher.card_row.entries.size()).is_equal(2)   # dev entry hidden
 	await _wait(0.3)
@@ -154,3 +159,22 @@ func test_intro_finishes_on_its_own() -> void:
 	await _wait(1.5)
 	assert_bool(done[0]).is_true()
 	assert_bool(intro.visible).is_false()
+
+
+func test_picker_close_drops_pending_confirm() -> void:
+	var picker: Control = auto_free(load("res://scenes/launcher/profile_picker.tscn").instantiate())
+	add_child(picker)
+	var got := []
+	picker.picked.connect(func(id): got.append("picked " + id))
+	picker.confirmed.connect(func(id): got.append("confirmed " + id))
+	picker.open("p1", 0)
+	await _press("launcher_confirm")
+	assert_array(got).contains_exactly(["picked p1"])
+	picker.close()
+	await _wait(CardLook.PICK_HOLD + 0.1)
+	assert_array(got).contains_exactly(["picked p1"])
+	picker.open("p2", 0)
+	assert_str(picker.picked_id).is_empty()
+	await _press("launcher_confirm")
+	await _wait(CardLook.PICK_HOLD + 0.1)
+	assert_array(got).contains_exactly(["picked p1", "picked p2", "confirmed p2"])
