@@ -66,9 +66,14 @@ func play(cue: String, position = null) -> void   # cue = file stem in assets/au
 func music(track: String, fade: float = 0.5) -> void
 func stop_music(fade: float = 0.5) -> void
 func bark(character: String, bark: String) -> void   # from openjar-characters voice packs
+func release_all() -> void                    # stop every player, drop streams and the cue cache
+func quit(exit_code: int = 0) -> void         # release_all(), wait 0.1 s, then get_tree().quit()
 ```
 
 Every action must call `Audio.play`. Missing cue files log a warning, never crash.
+Quit with `Audio.quit()`, never `get_tree().quit()` directly: a stream still playing at quit is
+reported as leaked at exit. The window close button goes through `Audio.quit()` as well
+(`Audio` turns off `auto_accept_quit`).
 
 ### `Debug` (`scripts/autoload/Debug.gd`)
 
@@ -139,7 +144,9 @@ The argument is passed **without** a `--` separator, so a Godot game must look f
 `OS.get_cmdline_args()` and `OS.get_cmdline_user_args()` (`Save.gd` does). The working directory
 is inherited from the launcher; games must not rely on it.
 
-While the game runs the launcher hides, ignores input and idles. When the process exits (any exit
+While the game runs the launcher hides, ignores input and idles. With `MINIMIZE_WHILE_RUNNING`
+(const in `launcher.gd`, default `true`) it also minimises its own window, and restores its
+previous mode (fullscreen) and focus when the game exits. It never changes the game's window. When the process exits (any exit
 code) the launcher shows the card row with that card highlighted. Start on the card row quits the
 launcher with exit code 0 (back to Steam).
 
@@ -148,8 +155,19 @@ launcher with exit code 0 (back to Steam).
 | Scene | Root script API |
 | --- | --- |
 | `scenes/launcher/intro.tscn` | `signal finished()`, `func play() -> void`, `func skip() -> void` |
-| `scenes/launcher/profile_picker.tscn` | `signal confirmed(profile_id: String)`, `signal back_requested()`, `func open(selected_id: String) -> void` |
-| `scenes/launcher/card.tscn` | `func setup(entry: Dictionary) -> void`, `func set_highlighted(on: bool) -> void`, `func bounce() -> void` |
+| `scenes/launcher/profile_picker.tscn` | `signal confirmed(profile_id: String)`, `signal back_requested()`, `signal picked(profile_id: String)`, `func open(selected_id: String) -> void`, `var picked_id: String` |
+| `scenes/launcher/card.tscn` | `func setup(entry: Dictionary) -> void`, `func set_highlighted(on: bool) -> void`, `func bounce() -> void`, `func wobble() -> void`, `func set_empty(on: bool) -> void`, `func set_placeholder_index(i: int) -> void`, `var empty: bool`, `var placeholder_index: int` |
+
+Picker: A emits `picked` at once (the face pops and stays happy; `picked_id` is set until the
+next `open()`), then `confirmed` `CardLook.PICK_HOLD` (0.35 s) later. Input is ignored in between.
+
+Card fallback art (`CardLook`, `scripts/launcher/card_look.gd`): a card without grid art shows
+tile `placeholder_index` (0..4) of `card_tiles.png`, `slug.hash() % 5`, bumped by the card row so
+two neighbours never share a tile. `card.gd` encodes it in the `Placeholder` colour so that
+`card_tiles.gdshader`'s `(r + 2g + 4b) % 5` lands on that index exactly; the empty slot
+(`set_empty(true)`, set by `setup({})`) uses `CardLook.EMPTY_TINT`, the shader's `empty_tint`.
+`bounce()` squashes to `(1.18, 1.06)` then stretches to `(1.08, 1.12)` of the highlight scale
+before settling; `wobble()` adds a small squash to the side-to-side shake.
 
 ### Launcher save keys (launcher's own `Save`, default profile)
 
