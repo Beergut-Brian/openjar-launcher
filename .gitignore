@@ -1,0 +1,14 @@
+# Godot
+.godot/
+*.import
+build/
+export_presets.cfg.local
+# gdUnit4 is installed per machine, tests are ours
+addons/gdUnit4/
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
+# local secrets
+.env
+reports/
