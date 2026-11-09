@@ -79,6 +79,13 @@ installed (Smash Party via its kiosk shortcut counts), launches one, comes back.
 - 2026-11-09: Start quits to Steam from every launcher screen (intro, picker, cards), not only
   the card row. Ignored while a game runs.
 - 2026-11-09: last card is remembered by `slug`, not position, so installs/removals do not shift it.
+- 2026-11-09: while a game runs the launcher minimises its own window and restores it (fullscreen,
+  foreground) when the game exits, so two fullscreen windows never fight for the TV. Switch:
+  `MINIMIZE_WHILE_RUNNING` in `scenes/launcher/launcher.gd` (default `true`; `false` = only hide).
+  It never touches the game's display mode. Untested on the TV.
+- 2026-11-09: A in the profile picker holds the picked (happy) face for 0.35 s before the card row.
+- 2026-11-09: fallback card tiles never repeat on neighbouring cards; a game keeps its own tile
+  unless the card next to it already has it.
 
 ## Open questions
 - Logo and jar design: Kaden approves the Art lane's three options.

@@ -35,6 +35,10 @@ window/stretch/mode="canvas_items"
 window/stretch/aspect="keep"
 window/vsync/vsync_mode=1
 
+[gui]
+
+theme/custom="res://scenes/ui/theme.tres"
+
 [input]
 
 p1_move_left={

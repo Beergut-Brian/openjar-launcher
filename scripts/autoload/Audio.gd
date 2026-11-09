@@ -16,6 +16,7 @@ var _cache := {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	get_tree().auto_accept_quit = false   # the close button goes through quit() too
 	for i in POOL_SIZE:
 		var p := AudioStreamPlayer.new()
 		p.bus = "SFX" if AudioServer.get_bus_index("SFX") != -1 else "Master"
@@ -24,6 +25,37 @@ func _ready() -> void:
 	_music = AudioStreamPlayer.new()
 	_music.bus = "Music" if AudioServer.get_bus_index("Music") != -1 else "Master"
 	add_child(_music)
+
+
+## Quit path. A stream that is still playing at quit keeps its playback alive in the AudioServer
+## (which only drops stopped playbacks on its mix thread), so the engine reports "ObjectDB instances
+## leaked / resources still in use" for it at exit. Every quit goes through quit() below, which
+## stops everything and gives the mixer a moment first. The window close button does the same.
+const QUIT_SETTLE_SECONDS := 0.1
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		quit(0)
+	elif what == NOTIFICATION_EXIT_TREE:
+		release_all()   # last resort if something called get_tree().quit() directly
+
+
+## Stop all sound, let the mixer release it, then quit with exit_code. Use instead of get_tree().quit().
+func quit(exit_code: int = 0) -> void:
+	release_all()
+	await get_tree().create_timer(QUIT_SETTLE_SECONDS, true, false, true).timeout
+	get_tree().quit(exit_code)
+
+
+## Stops every player, drops their streams and the cue cache. Safe to call more than once.
+func release_all() -> void:
+	for p in _pool + [_music]:
+		if p == null:
+			continue
+		p.stop()
+		p.stream = null
+	_cache.clear()
 
 
 func play(cue: String, _position = null) -> void:

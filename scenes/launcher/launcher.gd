@@ -8,6 +8,9 @@ enum Screen { INTRO, PICKER, CARDS, RUNNING }
 const POLL_SECONDS := 0.5
 const IDLE_SLEEP_USEC := 100000   # ~10 fps while a game runs
 const RETURN_GRACE_MS := 600      # swallow the button that quit the game
+## Minimise the launcher's window while a game runs and restore it (fullscreen) on return, so two
+## fullscreen windows never fight for the TV. Off = the launcher only hides. GAME.md decisions.
+const MINIMIZE_WHILE_RUNNING := true
 
 var screen: Screen = Screen.INTRO
 var root_dir := ""
@@ -15,6 +18,7 @@ var all_entries: Array[Dictionary] = []
 var profile := "p1"
 var _pid := -1
 var _running_slug := ""
+var _window_mode_before_run := -1
 
 @onready var intro: Control = $Intro
 @onready var picker: Control = $ProfilePicker
@@ -42,6 +46,14 @@ func _ready() -> void:
 		intro.play()
 	else:
 		_show_picker()
+	_report_cold_start()
+
+
+## Kid-design target: cold start to playing in under 10 s. Ticks count from engine start.
+func _report_cold_start() -> void:
+	await get_tree().process_frame
+	print("launcher: interactive (%s) after %d ms, unix %.3f" % [
+		Screen.keys()[screen], Time.get_ticks_msec(), Time.get_unix_time_from_system()])
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -57,7 +69,7 @@ func quit_to_steam() -> void:
 	Save.flush()
 	set_process_unhandled_input(false)
 	await get_tree().create_timer(0.25).timeout   # let the cue be heard
-	get_tree().quit(0)
+	Audio.quit(0)
 
 
 func _rescan(select_slug: String) -> void:
@@ -128,10 +140,13 @@ func _on_process_watch() -> void:
 	card_row.selected_card().bounce()
 
 
-## While a game runs: hidden, no input, ~10 fps. Display mode is never touched.
+## While a game runs: hidden, no input, ~10 fps, and minimised if MINIMIZE_WHILE_RUNNING.
 func _set_screen(to: Screen) -> void:
+	var was_running := screen == Screen.RUNNING
 	screen = to
 	var running := to == Screen.RUNNING
+	if running != was_running:
+		_apply_window_policy(running)
 	intro.visible = to == Screen.INTRO
 	picker.visible = to == Screen.PICKER
 	card_row.visible = to == Screen.CARDS
@@ -152,6 +167,19 @@ func _set_screen(to: Screen) -> void:
 		process_watch.start()
 	else:
 		process_watch.stop()
+
+
+func _apply_window_policy(running: bool) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	if running:
+		_window_mode_before_run = DisplayServer.window_get_mode()
+	var mode := WindowPolicy.mode_for(running, MINIMIZE_WHILE_RUNNING, _window_mode_before_run)
+	if mode == WindowPolicy.LEAVE:
+		return
+	DisplayServer.window_set_mode(mode)
+	if not running:
+		DisplayServer.window_move_to_foreground()
 
 
 static func _ensure_executable(path: String) -> void:

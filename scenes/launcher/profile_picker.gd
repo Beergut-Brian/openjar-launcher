@@ -1,9 +1,11 @@
 ## Two faces, no names. Left/right picks, A confirms (one press), B goes back to the card row.
 ## Profile ids: FaceP1 → "p1", FaceP2 → "p2". API in docs/contracts.md, "Launcher scenes".
+## A emits `picked` at once and `confirmed` CardLook.PICK_HOLD later, so the happy face is seen.
 extends Control
 
 signal confirmed(profile_id: String)
 signal back_requested()
+signal picked(profile_id: String)
 
 const IDS := ["p1", "p2"]
 const SELECTED_SCALE := 1.15
@@ -12,12 +14,17 @@ const OTHER_SCALE := 0.8
 var active := false
 var index := 0
 var _ignore_until := 0
+## Set on A until the next open(): the face that was picked (it stays big and happy).
+var picked_id := ""
+var _pick_token := 0
 
 @onready var faces: Array[Control] = [$Faces/FaceP1, $Faces/FaceP2]
 
 
 func open(selected_id: String, grace_ms: int = 150) -> void:
 	index = maxi(IDS.find(selected_id), 0)
+	picked_id = ""
+	_pick_token += 1
 	active = true
 	_ignore_until = Time.get_ticks_msec() + grace_ms
 	_highlight(false)
@@ -25,6 +32,7 @@ func open(selected_id: String, grace_ms: int = 150) -> void:
 
 func close() -> void:
 	active = false
+	_pick_token += 1   # a pending confirm is dropped
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -39,10 +47,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			index = to
 			_highlight(true)
 	elif event.is_action_pressed("launcher_confirm"):
-		Audio.play("ui_confirm")
-		_pop(faces[index])
-		active = false
-		confirmed.emit(IDS[index])
+		_pick()
 	elif event.is_action_pressed("launcher_back"):
 		Audio.play("ui_back")
 		active = false
@@ -50,6 +55,19 @@ func _unhandled_input(event: InputEvent) -> void:
 	else:
 		return
 	get_viewport().set_input_as_handled()
+
+
+func _pick() -> void:
+	Audio.play("ui_confirm")
+	_pop(faces[index])
+	active = false
+	picked_id = IDS[index]
+	picked.emit(picked_id)
+	_pick_token += 1
+	var token := _pick_token
+	await get_tree().create_timer(CardLook.PICK_HOLD).timeout
+	if token == _pick_token:
+		confirmed.emit(picked_id)
 
 
 func _highlight(animate: bool) -> void:

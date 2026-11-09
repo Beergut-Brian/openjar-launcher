@@ -34,9 +34,16 @@ func test_game_round_cycle() -> void:
 	assert_int(Game.state).is_equal(Game.State.ROUND_END)
 
 
+## Uses a throwaway profile: the default "p1" save is the launcher's own (last card, intro date).
 func test_save_roundtrip() -> void:
+	var saved_profile := Save.profile
+	Save.profile = "test_smoke"
+	Save._load()
 	Save.set_value("smoke", 42)
 	Save.flush()
 	assert_int(Save.get_value("smoke", 0)).is_equal(42)
 	Save.wipe()
 	assert_object(Save.get_value("smoke")).is_null()
+	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://saves/test_smoke.json"))
+	Save.profile = saved_profile
+	Save._load()
