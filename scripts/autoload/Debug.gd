@@ -1,8 +1,13 @@
 ## F3 overlay, F12 screenshot, --screenshot-after=<s> for headless review. Autoload: Debug.
+## Real frames without a monitor: --shots=1,3.5,6 [--shot-dir=/abs/dir] saves a PNG at each time (seconds
+## after boot) and quits after the last one. Needs a real renderer: run it through scripts/tools/shots.sh.
 extends CanvasLayer
 
 var _label: Label
 var _shot_after := -1.0
+var _shots: Array[float] = []
+var _shot_dir := "user://screenshots"
+var _clock := 0.0
 
 
 func _ready() -> void:
@@ -16,6 +21,12 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot-after="):
 			_shot_after = float(arg.trim_prefix("--screenshot-after="))
+		elif arg.begins_with("--shots="):
+			for s in arg.trim_prefix("--shots=").split(",", false):
+				_shots.append(float(s))
+			_shots.sort()
+		elif arg.begins_with("--shot-dir="):
+			_shot_dir = arg.trim_prefix("--shot-dir=")
 
 
 func _process(delta: float) -> void:
@@ -25,6 +36,13 @@ func _process(delta: float) -> void:
 			Game.State.keys()[Game.state],
 			Game.round_index,
 			str(Players.active_players())]
+	if not _shots.is_empty():
+		_clock += delta
+		if _clock >= _shots[0]:
+			var t: float = _shots.pop_front()
+			await screenshot("t%05.1fs" % t)
+			if _shots.is_empty():
+				get_tree().quit()
 	if _shot_after >= 0.0:
 		_shot_after -= delta
 		if _shot_after < 0.0:
@@ -39,15 +57,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		screenshot()
 
 
-func screenshot() -> String:
+func screenshot(tag: String = "") -> String:
 	if DisplayServer.get_name() == "headless":
 		# No renderer: report state instead so the Reviewer still gets a signal of life.
 		print("screenshot: headless, state=%s players=%s" % [Game.State.keys()[Game.state], str(Players.active_players())])
 		return ""
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
-	DirAccess.make_dir_recursive_absolute("user://screenshots")
-	var path := "user://screenshots/%s.png" % Time.get_datetime_string_from_system().replace(":", "-")
+	DirAccess.make_dir_recursive_absolute(_shot_dir)
+	var stamp := tag if tag != "" else Time.get_datetime_string_from_system().replace(":", "-")
+	var path := _shot_dir.path_join("%s.png" % stamp)
 	img.save_png(path)
 	print("screenshot: ", ProjectSettings.globalize_path(path))
 	return path
