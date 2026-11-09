@@ -1,0 +1,57 @@
+{
+  "id": "grownup",
+  "name": "Grown-up (hub profile p1)",
+  "head": {
+    "shape": "soft_square",
+    "size": 1.0049401848897004,
+    "ears": "round"
+  },
+  "skin": "#D99E6E",
+  "face": {
+    "eyes": "button",
+    "brows": "thin",
+    "nose": "dot",
+    "mouth": "smirk",
+    "brow_color": "#A35A22",
+    "blush": 0.41467200326992537,
+    "freckles": false,
+    "eye_spacing": 0.3203598717571221,
+    "lid": 0
+  },
+  "hair": {
+    "style": "curly",
+    "color": "#D9782D"
+  },
+  "headwear": {
+    "type": "cap",
+    "color": "#5CC6F2",
+    "brim": "#3E7BEA",
+    "tilt_deg": 8
+  },
+  "body": {
+    "build": "stocky",
+    "height": 1.1
+  },
+  "outfit": {
+    "top": {
+      "style": "tee",
+      "color": "#F4F4F0",
+      "accent": "#9B5DE5"
+    },
+    "bottoms": {
+      "style": "shorts",
+      "color": "#2C3E7A"
+    },
+    "shoes": {
+      "style": "sneaker",
+      "color": "#FF9A2E",
+      "sole": "#F4F4F0"
+    }
+  },
+  "costume": [],
+  "posture": {
+    "spine_lean": -1.1409002562027866,
+    "head_lean": 0.1348780120656503,
+    "arm_out": 2.927578835514872
+  }
+}
