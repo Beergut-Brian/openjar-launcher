@@ -1,0 +1,143 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="rock"]
+albedo_color = Color(0.78, 0.8, 0.93, 1)
+roughness = 0.9
+emission_enabled = true
+emission = Color(0.78, 0.8, 0.93, 1)
+emission_energy_multiplier = 0.15
+
+[sub_resource type="StandardMaterial3D" id="crater"]
+albedo_color = Color(0.55, 0.57, 0.75, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="white"]
+albedo_color = Color(1, 1, 1, 1)
+emission_enabled = true
+emission = Color(1, 1, 1, 1)
+emission_energy_multiplier = 0.6
+
+[sub_resource type="StandardMaterial3D" id="flag"]
+albedo_color = Color(1, 0.79, 0.24, 1)
+emission_enabled = true
+emission = Color(1, 0.79, 0.24, 1)
+emission_energy_multiplier = 0.5
+
+[sub_resource type="StandardMaterial3D" id="planet"]
+albedo_color = Color(0.45, 0.85, 1, 1)
+emission_enabled = true
+emission = Color(0.45, 0.85, 1, 1)
+emission_energy_multiplier = 0.5
+
+[sub_resource type="StandardMaterial3D" id="ring"]
+albedo_color = Color(1, 0.62, 0.82, 1)
+emission_enabled = true
+emission = Color(1, 0.62, 0.82, 1)
+emission_energy_multiplier = 0.5
+
+[sub_resource type="SphereMesh" id="moon_mesh"]
+material = SubResource("rock")
+radius = 0.78
+height = 1.56
+
+[sub_resource type="CylinderMesh" id="crater_mesh"]
+material = SubResource("crater")
+top_radius = 0.16
+bottom_radius = 0.16
+height = 0.04
+
+[sub_resource type="CylinderMesh" id="pole_mesh"]
+material = SubResource("white")
+top_radius = 0.02
+bottom_radius = 0.02
+height = 0.7
+
+[sub_resource type="PrismMesh" id="flag_mesh"]
+material = SubResource("flag")
+left_to_right = 0.0
+size = Vector3(0.3, 0.22, 0.02)
+
+[sub_resource type="SphereMesh" id="ball_mesh"]
+material = SubResource("white")
+radius = 0.07
+height = 0.14
+
+[sub_resource type="SphereMesh" id="planet_mesh"]
+material = SubResource("planet")
+radius = 0.2
+height = 0.4
+
+[sub_resource type="TorusMesh" id="ring_mesh"]
+material = SubResource("ring")
+inner_radius = 0.26
+outer_radius = 0.36
+
+[sub_resource type="Animation" id="orbit"]
+resource_name = "idle"
+length = 6.0
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Orbit:rotation")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 6),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 6.28319, 0)]
+}
+
+[sub_resource type="AnimationLibrary" id="lib"]
+_data = {
+&"idle": SubResource("orbit")
+}
+
+[node name="MoonGolf" type="Node3D"]
+
+[node name="Moon" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.5, 0, 0, 0, 1, 0, 0.39, 0)
+mesh = SubResource("moon_mesh")
+
+[node name="Crater1" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.3, 0.74, 0.2)
+mesh = SubResource("crater_mesh")
+
+[node name="Crater2" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.7, 0, 0, 0, 1, 0, 0, 0, 0.7, 0.35, 0.72, 0.3)
+mesh = SubResource("crater_mesh")
+
+[node name="Hole" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.5, 0, 0, 0, 1, 0, 0, 0, 0.5, 0.1, 0.77, -0.15)
+mesh = SubResource("crater_mesh")
+
+[node name="Pole" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 1.12, -0.15)
+mesh = SubResource("pole_mesh")
+
+[node name="Flag" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.26, 1.36, -0.15)
+mesh = SubResource("flag_mesh")
+
+[node name="Ball" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.1, 0.84, 0.35)
+mesh = SubResource("ball_mesh")
+
+[node name="Orbit" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.55, 0)
+
+[node name="Planet" type="MeshInstance3D" parent="Orbit"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, 0, 0)
+mesh = SubResource("planet_mesh")
+
+[node name="Ring" type="MeshInstance3D" parent="Orbit/Planet"]
+transform = Transform3D(1, 0, 0, 0, 0.2, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("ring_mesh")
+
+[node name="Lamp" type="OmniLight3D" parent="."]
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+libraries = {
+&"": SubResource("lib")
+}

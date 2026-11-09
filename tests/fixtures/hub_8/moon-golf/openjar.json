@@ -4,5 +4,6 @@
   "version": "v0.0.1",
   "binary": "game.sh",
   "dev": false,
+  "jar": "store/jar.tscn",
   "grid": "store/grid.png"
 }

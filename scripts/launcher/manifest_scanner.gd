@@ -48,8 +48,8 @@ static func filter_dev(entries: Array[Dictionary], show_dev: bool) -> Array[Dict
 
 
 ## One folder's manifest as a normalised entry, or {} (with a warning) if it is unusable.
-## Entry keys: slug, name, version, dir, binary, command, args, grid, hero, clip, dev.
-## binary/grid/hero/clip are absolute ("" when absent); command/args are PackedStringArray.
+## Entry keys: slug, name, version, dir, binary, command, args, grid, hero, clip, jar, dev.
+## binary/grid/hero/clip/jar are absolute ("" when absent); command/args are PackedStringArray.
 static func read_manifest(dir: String) -> Dictionary:
 	var path := dir.path_join(MANIFEST)
 	if not FileAccess.file_exists(path):
@@ -79,6 +79,7 @@ static func read_manifest(dir: String) -> Dictionary:
 		"grid": _rel_path(dir, data, "grid"),
 		"hero": _rel_path(dir, data, "hero"),
 		"clip": _rel_path(dir, data, "clip"),
+		"jar": _rel_path(dir, data, "jar"),
 		"dev": data.get("dev") is bool and data.dev,
 	}
 	if data.has("args"):
