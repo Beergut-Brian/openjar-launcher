@@ -94,19 +94,43 @@ island never looks broken; A makes it wobble.
 
 A **jar on a plinth**, 3 m tall, about three Jarlings high: readable from anywhere on the island.
 
-- **Poster inside:** the game's `store/grid.png` (600x900) on a standing card, unshaded and
-  slightly emissive, so it reads at dusk and blooms a little. No text is added by the hub.
-- **No art yet:** a chunky toy shape (ball, ring, wedge and friends) in a palette colour
-  spins slowly in the jar instead; neighbours never share a toy.
+- **A tiny world inside** (the idea is from the other hub entry, branch `feature/hub-opus`): each
+  jar is a snow globe of its game, on a slow turntable. A game ships its own as `"jar"` in its
+  manifest (`store/jar.glb` or a self-contained `store/jar.tscn`, see `docs/contracts.md`); the hub
+  strips lights, cameras, sounds and scripts, fits it to the jar and loops its animation.
+- **No `jar` yet:** a generated diorama, one of eight (meadow, space, ocean, volcano, forest,
+  castle, snow, candy), picked from the slug so it never changes and neighbours never match, and
+  coloured from the game's accent. No text. If the game has a `grid` poster it stands at the back
+  of the diorama as a small backdrop card, so the game is still recognisable.
+- **Neither:** the diorama alone, coloured from the slug.
 - **Accent:** lid, glowing base disc and jar light take the poster's dominant colour.
 - **Dev build:** dark slate lid with an amber beacon bulb on top. Only present after the
   grown-up combo (hold LB+RB 1 s).
-- **Idle:** the poster bobs and sways a few degrees inside the glass; a toy spins.
+- **Idle:** the world turns slowly; a little faster when a Jarling stands at the jar.
 - **Focused** (a Jarling stands on its pad): lid lifts and tilts, beam of light rises, jar light
   doubles, pad ring fills with **that player's colour**, jar does a squash-and-stretch bounce, a
   sound plays.
-- **Launch:** Jarling cheers, arcs up and drops into the jar mouth, jar flashes white, the game
-  starts. **Return:** Jarling pops out, jar bounces.
+
+### The launch moment (2.3 s, `LaunchSequence`)
+
+"The top of the jar spins off and we jump inside of it." One clock, seven beats, one sound each;
+everything on screen is posed from the clock, so it plays the same every time.
+
+| Time | Beat | What you see | Cue |
+| --- | --- | --- | --- |
+| 0.0 | rattle | the Jarling crouches, the jar squashes, shakes and glows brighter, the lid chatters | `jar_rattle` |
+| 0.5 | lid pop | the jar springs tall, the lid spins off high into the sky, the Jarling flinches | `intro_pop` |
+| 0.8 | leap | stretch, a somersault over the rim, the camera tips up to follow | `jarling_jump` |
+| 1.25 | lid lands | on the friend's head as a hat (or on the plaza if the friend is far away) | `lid_land` |
+| 1.3 | splash | the Jarling drops through the mouth, shrinking; sparkles burst out | `jar_splash` |
+| 1.45 | dive | it lands tiny in the world and waves; the camera goes over the rim and down after it; Jeff and Chuck cheer | `launch` |
+| 2.3 | go | the tiny world fills the screen, a flash of the jar's colour, the game starts | (the game's own) |
+
+A during the animation does nothing: the game starts once, on the last beat. Nothing is fast, dark
+or loud enough to startle: the jar's glow settles as the camera goes in, and the flash is a pastel.
+
+**Return:** the screen clears, the Jarling pops back out of the jar with sparkles (`jar_pop_out`),
+lands on its pad, and the lid drops out of the sky and lands on the jar with a `lid_bonk`.
 
 ## Interaction flow
 
@@ -116,15 +140,20 @@ A **jar on a plinth**, 3 m tall, about three Jarlings high: readable from anywhe
    a wobble at either end). This is the five-year-old path: flick, flick, A.
 3. **Any other stick direction = walk freely.** Walk near a jar and it opens for you.
 4. **A:** at a jar → jump in and launch. Anywhere else → a happy cheer hop (never nothing).
-5. **B (solo) = be the other Jarling.** That is the profile pick: two characters, no names. The
-   other Jarling tags along behind you as a friend. Remembered for next time; the Jarling that
+5. **B (solo) = be the other Jarling.** That is the profile pick: two generic kit Jarlings, a
+   grown-up (`p1`, blue cap) and a kid (`p2`, yellow bobble hat), no names. The other one tags
+   along behind you as a friend. Remembered for next time; the Jarling that
    jumps in decides which save the game opens (`--profile=p1|p2`).
 6. **Second controller presses anything:** the tag-along friend becomes Player 2 on the spot
-   (P1 is Jeff with the green ring, P2 is Chuck with the red ring). Either can launch.
+   (P1 keeps the Jarling they picked, P2 holds the other; the ring under each is the player's
+   colour, green for P1 and red for P2). Either can launch.
+   **Jeff and Chuck** are player-locked characters, so they are never a profile: they live on the
+   island as residents, Jeff on the left (P1's side) and Chuck on the right, and cheer when someone
+   jumps into a jar or a second player joins.
 7. **Start:** back to Steam. **LB+RB held 1 s:** dev jars appear / disappear.
 
-Every one of these plays a sound (`ui_move`, `ui_confirm`, `ui_back`, `ui_toggle`, `launch`,
-`player_join`) and moves something.
+Every one of these plays a sound (`ui_move`, `ui_confirm`, `ui_back`, `ui_toggle`, `player_join`,
+and the launch cues above) and moves something.
 
 ## Performance plan (60 fps, 1080p, GTX 1060, Forward+)
 
@@ -132,30 +161,38 @@ Budget 16.6 ms. Expected cost on a 1060, by reasoning (not yet measured on the t
 
 | Item | Count | Reasoning |
 | --- | --- | --- |
-| Triangles | about 150 to 200 k | two Jarlings at about 30 k each are the bulk; jars are 1.5 k lathes; trees and clouds are low-segment spheres. A 1060 draws several million per frame at 60 |
-| Draw calls | about 250 with 8 jars | bulbs are one MultiMesh, fireflies one CPUParticles3D; opaque set meshes could be merged later if needed |
+| Triangles | about 150 to 200 k | four Jarlings at about 30 k each are the bulk (two profiles, Jeff, Chuck); jars are 1.5 k lathes; a tiny world is a few hundred to 5 k (the contract's cap); trees and clouds are low-segment spheres. A 1060 draws several million per frame at 60 |
+| Draw calls | about 400 with 8 jars (each tiny world is 10 to 25 small meshes) | bulbs are one MultiMesh, fireflies one CPUParticles3D; opaque set meshes could be merged later if needed |
 | Shadows | 1 directional, 2 splits, 4096 atlas | the single biggest cost, about 1.5 to 2 ms; everything else is shadowless |
 | Lights | 2 directional + up to 10 small omnis | omnis are clustered, range 7, no shadows, each touches few pixels |
 | Transparency | jar glass (8), beams (1 to 2), pads | one layer each, no refraction, no screen-texture read |
 | Post | glow + ACES + depth/height fog | about 1 ms; fog is the analytic kind, not volumetric |
 | MSAA | 2x | glass edges and string lights need it; about 1 ms |
 | Sky | static shader | no `TIME`, so the radiance map is built once at boot |
-| Skinning | 2 skeletons | negligible |
+| Skinning | 4 skeletons | negligible |
 
 Total estimate: 5 to 7 ms GPU, leaving more than half the frame spare. If a profile on the real
 box says otherwise the order to cut is: shadow atlas 4096 → 2048, MSAA off + FXAA, omni count.
-Cold start: no threaded loading needed; jar posters are loaded straight from disk
-(`Image.load_from_file`, 600x900 each). The hub prints `launcher: interactive ... after N ms`.
+No SDFGI, no volumetric fog, no reflection probes, one shadowed light.
+
+**What I would bake** once the island stops changing: the sun's shadows and bounce on the static
+set (ground, plinths, trees, floating islets) into one LightmapGI, so the real-time shadow map only
+has to cover the Jarlings and lids (one split, 2048); the trees, clouds and islets merged into one
+mesh per material (about 150 fewer draw calls); and the eight jar omnis replaced by a baked glow
+on the plinth plus emission, keeping a live omni only on the focused jar.
+
+Cold start: no threaded loading needed; jar posters and jar worlds are loaded straight from disk
+(`Image.load_from_file`, `GLTFDocument`), a few ms each at the contract's size cap. The hub prints `launcher: interactive ... after N ms`.
 
 ## What next, with more time
 
-- **Jars that show the game, not just its poster:** `hero.png` as a banner flag on the lid and
-  `clip.mp4` playing inside the focused jar.
+- **Jar worlds from the real games:** a Blender template and a one-page guide so each game's art
+  lane can make its `store/jar.glb` in an afternoon; `clip.mp4` on the backdrop card of the focused jar.
 - **A crowd:** three or four generic Jarlings from the avatar kit (`build_jarling.py --seed N`)
   wandering, sitting on the island edge, waving when you pass.
 - **More than 10 games:** a second, raised terrace behind the first arc (the layout maths already
   isolates this in `HubLayout`); today 9+ jars start to crowd.
-- **Launch moment:** camera dives into the jar after the Jarling, white-out, then the game.
+- **The lid hat:** let the friend keep wearing the lid until the game comes back.
 - **Life:** jar lids rattle now and then for a game you have not played in a while; kites; a
   slow day-to-night drift across a play session; a hot-air balloon that carries new installs in.
 - **Sound:** footsteps on stone vs grass, a glassy "tunk" for jars, per-jar hum on focus, Jarling
