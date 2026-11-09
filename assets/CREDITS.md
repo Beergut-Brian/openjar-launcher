@@ -68,3 +68,5 @@ One line per file. Nothing enters `assets/` without a line here.
 | `assets/shaders/drift.gdshader` | hand-written Godot shader | scrolls the cloud strip | Original work, Open Jar Games |
 | `assets/shaders/drift.tres` | Pillow script `art/gen/build.py` | ShaderMaterial for drift.gdshader (palette values baked in) | Original work, Open Jar Games |
 | `scenes/ui/theme.tres` | Pillow script `art/gen/build.py` | house UI theme: rounded panels, thick ink borders, palette colours; engine default font (no open chunky font offline) | Original work, Open Jar Games |
+| `store/grid.png` | Pillow script `art/gen/build.py` | 600x900 launcher store card: logo A, Jeff/Chuck stand-ins, burst, hills | Original work, Open Jar Games |
+| `store/hero.png` | Pillow script `art/gen/build.py` | 920x430 launcher banner: logo A, Jeff/Chuck stand-ins, burst, hills | Original work, Open Jar Games |
