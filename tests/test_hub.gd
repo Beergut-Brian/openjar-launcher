@@ -1,10 +1,13 @@
 ## End to end through hub.tscn: jars from the 0/1/2/8 fixtures, walking up to jars, launching a fake game
-## and coming back, and picking a Jarling (profile). Uses a throwaway Save profile.
+## and coming back, picking a profile, and the in-line character chooser (Roster picks). Uses a
+## throwaway Save profile and a throwaway shared picks file.
 class_name TestHub
 extends GdUnitTestSuite
 
 const PROFILE := "test_hub"
 const HUB := "res://scenes/hub/hub.tscn"
+const PICKS := "user://test_hub/players.json"
+const THREE := "res://tests/fixtures/roster_three.json"
 
 var root: String
 var log_path: String
@@ -18,6 +21,10 @@ func before_test() -> void:
 	Save.profile = PROFILE
 	Save.wipe()
 	root = ""
+	Roster.picks_path = PICKS
+	Roster.data_path = "res://data/roster.json"
+	Roster.args_override = PackedStringArray(["--test-hub"])
+	_wipe_picks()
 
 
 func after_test() -> void:
@@ -26,6 +33,14 @@ func after_test() -> void:
 	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://saves/%s.json" % PROFILE))
 	Save.profile = _saved_profile
 	Save._load()
+	_wipe_picks()
+	Roster.picks_path = Roster.TEST_PICKS
+	Roster.data_path = "res://data/roster.json"
+	Roster.args_override = PackedStringArray()
+	Roster.profile_override = ""
+	Roster.reload()
+	for a in ["p1_change", "p2_change"]:
+		Input.action_release(a)
 	OS.set_environment("OPENJAR_ROOT", _saved_env)
 	for a in ["p1_move_left", "p1_move_right", "p1_move_up", "p1_move_down", "p1_action", "p1_jump"]:
 		Input.action_release(a)
@@ -38,6 +53,23 @@ func after_test() -> void:
 		DirAccess.remove_absolute(root.path_join(d))
 	DirAccess.remove_absolute(log_path)
 	DirAccess.remove_absolute(root)
+
+
+func _wipe_picks() -> void:
+	for f in [PICKS, PICKS + ".tmp"]:
+		if FileAccess.file_exists(f):
+			DirAccess.remove_absolute(f)
+
+
+func _write_picks(d: Dictionary) -> void:
+	DirAccess.make_dir_recursive_absolute(PICKS.get_base_dir())
+	var f := FileAccess.open(PICKS, FileAccess.WRITE)
+	f.store_string(JSON.stringify(d))
+	f.close()
+
+
+func _picks_file() -> Dictionary:
+	return JSON.parse_string(FileAccess.get_file_as_string(PICKS)) if FileAccess.file_exists(PICKS) else {}
 
 
 func _fixture(n: int) -> String:
@@ -173,13 +205,17 @@ func test_eight_jars_are_sorted_and_each_holds_a_tiny_world() -> void:
 		assert_array(s.find_children("*", "Label3D", true, false)).is_empty()
 
 
-func test_profile_jarlings_are_generic_and_jeff_and_chuck_are_residents() -> void:
+func test_held_jarlings_are_the_picks_and_jeff_and_chuck_are_residents() -> void:
 	var hub := await _hub(_fixture(2))
 	assert_int(hub.jarlings.size()).is_equal(2)
 	assert_str(hub.jarlings[0].profile_id).is_equal("p1")
 	assert_str(hub.jarlings[1].profile_id).is_equal("p2")
-	assert_bool(hub.jarlings[1].height < hub.jarlings[0].height).is_true()   # a grown-up and a kid
+	assert_str(hub.lead_jarling().character_id).is_equal("jeff")   # the defaults: P1 Jeff, P2 Chuck
+	assert_str(hub.jarlings[1].character_id).is_equal("chuck")
+	assert_bool(hub.jarlings[1].height < hub.jarlings[0].height).is_true()   # Chuck is the kid
 	assert_int(hub.residents.size()).is_equal(2)
+	assert_str(hub.residents[0].character_id).is_equal("jeff")
+	assert_str(hub.residents[1].character_id).is_equal("chuck")
 	for r: HubJarling in hub.residents:
 		assert_bool(hub.jarlings.has(r)).is_false()       # never held, never a profile
 		assert_bool(r._ring.visible).is_false()
@@ -328,7 +364,8 @@ func test_launch_hand_off_return_and_profile_pick() -> void:
 	assert_str(hub.selected_entry().slug).is_equal("b-game")
 	assert_str(LauncherState.last_card(Save)).is_equal("b-game")
 	# one line: the spam did not start it twice
-	assert_str(FileAccess.get_file_as_string(log_path).strip_edges()).is_equal("b-game --profile=p1 --from-test")
+	assert_str(FileAccess.get_file_as_string(log_path).strip_edges()).is_equal(
+			"b-game --profile=p1 --p1-char=jeff --p2-char=chuck --from-test")
 
 	await _wait(1.8)                                   # return grace, the jump back out, the lid bonk
 	assert_bool(hub.jarlings[0].visible).is_true()
@@ -346,7 +383,7 @@ func test_launch_hand_off_return_and_profile_pick() -> void:
 	await _wait_for_screen(hub, hub.Screen.RUNNING, 4.0)
 	await _wait_for_screen(hub, hub.Screen.HUB, 5.0)
 	var lines := FileAccess.get_file_as_string(log_path).strip_edges().split("\n")
-	assert_str(lines[lines.size() - 1]).is_equal("b-game --profile=p2 --from-test")
+	assert_str(lines[lines.size() - 1]).is_equal("b-game --profile=p2 --p1-char=jeff --p2-char=chuck --from-test")
 
 
 func test_picked_jarling_is_remembered() -> void:
@@ -370,3 +407,133 @@ func test_second_player_takes_the_other_jarling_and_rings_are_by_player() -> voi
 	assert_object(hub.jarlings[1].follow).is_null()
 	hub.pick_profile("p1")                            # no swapping once both are held
 	assert_str(hub.profile).is_equal("p2")
+
+
+# ---------------------------------------------------------------- the in-line character chooser
+
+func test_picks_from_the_shared_file_build_the_jarlings() -> void:
+	_write_picks({"p1": {"P1": "chuck", "P2": "jeff"}})
+	var hub := await _hub(_fixture(2))
+	assert_str(hub.jarling_for(Players.P1).character_id).is_equal("chuck")
+	assert_str(hub.jarlings[1].character_id).is_equal("jeff")
+	assert_that(hub.jarling_for(Players.P1).color).is_equal(Players.COLOR[Players.P1])   # still green
+
+
+func test_solo_change_trades_with_the_tag_along_and_is_remembered() -> void:
+	var hub := await _hub(_fixture(2))
+	var me: HubJarling = hub.jarling_for(Players.P1)
+	var pos: Vector3 = me.position
+	assert_bool(hub.change_character(Players.P1)).is_true()
+	assert_bool(me.swapping).is_true()
+	assert_bool(hub.change_character(Players.P1)).is_false()   # mid-swap presses are ignored
+	await _wait(0.6)
+	assert_bool(me.swapping).is_false()
+	assert_str(me.character_id).is_equal("chuck")
+	assert_str(hub.jarlings[1].character_id).is_equal("jeff")  # the friend took the old one
+	assert_bool(me.tag_visible()).is_true()
+	assert_str(me._tag.text).is_equal("Chuck")
+	assert_vector(me.position).is_equal(pos)                 # changed in place
+	assert_dict(_picks_file()).is_equal({"p1": {"P1": "chuck", "P2": "jeff"}})
+	await _wait(1.3)
+	assert_bool(me.tag_visible()).is_false()                 # the tag is gone after ~1.5 s
+
+
+func test_the_change_button_cycles_but_not_during_a_launch() -> void:
+	_fake_games()
+	var hub := await _hub(root)
+	Input.action_press("p1_change")
+	_step(hub, DT * 2)
+	Input.action_release("p1_change")
+	_step(hub, DT * 2)
+	assert_str(Roster.pick(Players.P1)).is_equal("chuck")
+	await _wait(0.6)
+	_walk_to_jar(hub, 0)
+	hub.press_action(Players.P1)
+	assert_bool(hub.launch.active).is_true()
+	assert_bool(hub.change_character(Players.P1)).is_false()
+	assert_str(Roster.pick(Players.P1)).is_equal("chuck")
+	hub.launch.cancel()
+
+
+func test_two_players_skip_the_other_pick() -> void:
+	Roster.data_path = THREE
+	var hub := await _hub(_fixture(2))
+	hub.join_second_player()
+	assert_bool(hub.change_character(Players.P1)).is_true()   # jeff -> pip: chuck is P2's
+	await _wait(0.6)
+	assert_str(hub.jarling_for(Players.P1).character_id).is_equal("pip")
+	assert_str(hub.jarling_for(Players.P2).character_id).is_equal("chuck")
+	assert_bool(hub.change_character(Players.P2)).is_true()   # chuck -> jeff
+	await _wait(0.6)
+	assert_str(hub.jarling_for(Players.P2).character_id).is_equal("jeff")
+	assert_bool(hub.change_character(Players.P1)).is_true()   # pip -> (jeff taken) -> chuck
+	await _wait(0.6)
+	assert_str(Roster.pick(Players.P1)).is_equal("chuck")
+	assert_that(hub.jarling_for(Players.P2).color).is_equal(Players.COLOR[Players.P2])
+
+
+func test_two_players_and_nobody_free_shakes_and_stays() -> void:
+	var hub := await _hub(_fixture(2))
+	hub.join_second_player()
+	assert_bool(hub.change_character(Players.P1)).is_false()
+	assert_str(Roster.pick(Players.P1)).is_equal("jeff")
+	assert_str(Roster.pick(Players.P2)).is_equal("chuck")
+	assert_bool(FileAccess.file_exists(PICKS)).is_false()
+
+
+func test_a_resident_who_is_on_screen_already_is_hidden() -> void:
+	Roster.data_path = THREE
+	_write_picks({"p1": {"P1": "pip", "P2": "chuck"}})
+	var hub := await _hub(_fixture(2))
+	assert_bool(hub.residents[0].visible).is_true()          # Jeff: nobody is playing him
+	assert_bool(hub.residents[1].visible).is_false()         # Chuck: P2's Jarling already is Chuck
+	hub.change_character(Players.P1)                         # pip -> jeff (solo: next in order, wraps)
+	await _wait(0.6)
+	assert_str(Roster.pick(Players.P1)).is_equal("jeff")
+	assert_bool(hub.residents[0].visible).is_false()
+	assert_bool(hub.residents[1].visible).is_false()
+
+
+func test_profile_swap_switches_to_that_profiles_picks_in_place() -> void:
+	_write_picks({"p1": {"P1": "jeff", "P2": "chuck"}, "p2": {"P1": "chuck", "P2": "jeff"}})
+	var hub := await _hub(_fixture(2))
+	var at: Vector3 = hub.lead_jarling().position
+	hub.pick_profile("p2")
+	await _wait(0.6)
+	assert_str(Roster.profile_override).is_equal("p2")
+	assert_str(hub.lead_jarling().character_id).is_equal("chuck")
+	assert_vector(hub.lead_jarling().position).is_equal(at)   # you stay where you were
+	assert_object(hub.lead_jarling()).is_same(hub.jarlings[1])
+	hub.change_character(Players.P1)                          # a change now lands in p2's entry
+	await _wait(0.6)
+	assert_dict(_picks_file()).is_equal({"p1": {"P1": "jeff", "P2": "chuck"}, "p2": {"P1": "jeff", "P2": "chuck"}})
+
+
+func test_launch_passes_the_picks_and_return_rereads_the_file() -> void:
+	_fake_games()
+	_write_picks({"p1": {"P1": "chuck", "P2": "jeff"}})
+	var hub := await _hub(root)
+	_walk_to_jar(hub, 0)
+	hub.press_action(Players.P1)
+	await _wait_for_screen(hub, hub.Screen.RUNNING, 4.0)
+	_write_picks({"p1": {"P1": "jeff", "P2": "chuck"}})   # changed inside the game
+	await _wait_for_screen(hub, hub.Screen.HUB, 5.0)
+	assert_str(FileAccess.get_file_as_string(log_path).strip_edges()).is_equal(
+			"a-game --profile=p1 --p1-char=chuck --p2-char=jeff --from-test")
+	assert_str(hub.lead_jarling().character_id).is_equal("jeff")
+	assert_str(hub.jarlings[1].character_id).is_equal("chuck")
+
+
+func test_the_hint_shows_by_the_ring_when_you_stand_still() -> void:
+	var hub := await _hub(_fixture(2))
+	var me: HubJarling = hub.jarling_for(Players.P1)
+	_step(hub, 0.5)
+	assert_bool(me.hint_visible()).is_false()
+	_step(hub, 1.6)
+	assert_bool(me.hint_visible()).is_true()
+	assert_str(me._hint.text).ends_with("Change")
+	assert_bool(hub.jarlings[1]._hint.visible).is_false()    # the tag-along has no hint
+	_stick(Vector2(1, 0))
+	_step(hub, 0.25)
+	_stick(Vector2.ZERO)
+	assert_bool(me.hint_visible()).is_false()

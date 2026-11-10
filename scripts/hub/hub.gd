@@ -17,17 +17,20 @@ const DEMO_STOP := 0.5            # --demo: a walking Jarling counts as "there" 
 const DEMO_PAUSE := 1.6           # --demo tour: how long it stands at each jar before walking on
 const INTRO_SECONDS := 2.6        # the camera glides in from the wide shot; input works throughout
 const SKY_SHADER := preload("res://assets/shaders/hub/sky.gdshader")
-## Profile id → Jarling: two generic kit Jarlings, a grown-up and a kid. Not player-locked.
+## Fallback bodies by profile id, only if the Roster has no model for a pick (no data/roster.json).
 const MODELS := {
 	"p1": preload("res://assets/models/jarlings/grownup.glb"),
 	"p2": preload("res://assets/models/jarlings/kid.glb"),
 }
 const SIZES := {"p1": 1.15, "p2": 0.86}
-## Jeff (P1 side, left) and Chuck (P2 side, right) live on the island; nobody controls them.
-const RESIDENTS := [
-	[preload("res://assets/models/jarlings/jeff.glb"), Vector3(-5.6, 0, 1.4)],
-	[preload("res://assets/models/jarlings/chuck.glb"), Vector3(5.6, 0, 1.4)],
-]
+const CHARACTER_SIZE := 1.15      # every Roster character: their own build already sets their height
+## Jeff (left) and Chuck (right) live on the island; nobody controls them. A resident who is the
+## same character as one of the two held Jarlings is hidden, so nobody is on screen twice.
+const RESIDENTS := [["jeff", Vector3(-5.6, 0, 1.4)], ["chuck", Vector3(5.6, 0, 1.4)]]
+## The in-line chooser: Back / View / Select on the pad (JOY_BUTTON_BACK), Tab (P1) or / (P2) on the
+## keyboard. A button nothing else in the hub uses and a small one a kid does not mash. GAME.md.
+const CHANGE_BUTTON := JOY_BUTTON_BACK
+const CHANGE_SOUND := "intro_pop"  # stand-in until a character has recorded barks
 const SUN_DIR := Vector3(0.42, 0.2, -1.0)   # the sun you see: low behind the jars, a little to the right
 ## The light itself comes from higher up on the same bearing, so shadows stay short and crisp.
 const LIGHT_DIR := Vector3(0.42, 0.46, -1.0)
@@ -45,6 +48,7 @@ var launch := LaunchSequence.new()       # active while the launch animation pla
 var focus: Array[int] = [-1, -1]         # jar each Jarling is looking into, by Jarling index
 var profile := "p1"                      # the Jarling player 1 picked; remembered
 var two_players := false
+var _change_down: Array[bool] = [false, false]   # by player: the change button was down last frame
 
 var _pid := -1
 var _running_slug := ""
@@ -82,15 +86,30 @@ var _demo_rest := 0.0
 func _ready() -> void:
 	_build_sky_and_lights()
 	HubWorld.build(world)
-	for id: String in LaunchArgs.PROFILES:
+	profile = LauncherState.profile(Save)
+	var demo := demo_script(OS.get_environment("HUB_DEMO"), OS.get_cmdline_args() + OS.get_cmdline_user_args())
+	if not demo.is_empty():   # a demo or shots run never changes anybody's real picks
+		Roster.picks_path = DEMO_PICKS
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(DEMO_PICKS))
+	Roster.profile_override = profile   # the picks entry follows the hub's profile, not the launcher's Save
+	Roster.reload()
+	for id: String in LaunchArgs.PROFILES:   # built as the picks straight away (lead = P1's pick)
+		var pick := Roster.pick(Players.P1 if id == profile else Players.P2)
+		var scene := character_scene(pick)
 		var j := HubJarling.new()
 		add_child(j)
-		j.setup(MODELS[id], id, Players.COLOR[jarlings.size()], SIZES[id])
+		j.setup(scene if scene else MODELS[id], id, Players.COLOR[jarlings.size()],
+				CHARACTER_SIZE if scene else SIZES[id])
+		j.character_id = pick if scene else ""
 		jarlings.append(j)
 	for r: Array in RESIDENTS:
 		var j := HubJarling.new()
 		add_child(j)
-		j.setup(r[0], "", Color.WHITE)
+		var scene := character_scene(r[0])
+		if scene == null:
+			continue
+		j.setup(scene, "", Color.WHITE, CHARACTER_SIZE)
+		j.character_id = r[0]
 		j.set_held(false)
 		j.position = r[1]
 		j.rotation.y = atan2(-j.position.x, 6.0)
@@ -103,15 +122,15 @@ func _ready() -> void:
 	_flash.color = Color(1, 1, 1, 0)
 	layer.add_child(_flash)
 	root_dir = ManifestScanner.default_root()
-	profile = LauncherState.profile(Save)
 	two_players = Players.is_active(Players.P2)
 	Players.player_joined.connect(_on_player_joined)
 	Players.player_left.connect(_on_player_left)
 	_apply_roles()
+	apply_characters()
 	_rescan(LauncherState.last_card(Save))
 	process_watch.wait_time = POLL_SECONDS
 	process_watch.timeout.connect(_on_process_watch)
-	_parse_demo(demo_script(OS.get_environment("HUB_DEMO"), OS.get_cmdline_args() + OS.get_cmdline_user_args()))
+	_parse_demo(demo)
 	Audio.music("card_row_loop")
 	_update_camera(0.0)
 	_report_cold_start()
@@ -213,9 +232,11 @@ func _apply_roles() -> void:
 		j.set_held(held, Players.COLOR[Players.P1 if j == lead else Players.P2])
 		if not held:
 			j.move_input = Vector2.ZERO
+	_update_hints()
 
 
 func _on_player_joined(player: int, _device: int) -> void:
+	_update_hints()
 	if player == Players.P2:
 		join_second_player()
 
@@ -231,21 +252,36 @@ func join_second_player() -> void:
 	if two_players:
 		return
 	two_players = true
+	_change_down[Players.P2] = true   # the press that joined never also changes the character
 	_apply_roles()
 	jarling_for(Players.P2).cheer()
-	residents[1].cheer()
+	for r in residents:
+		if r.visible:
+			r.cheer()
 
 
 ## Solo profile pick: B swaps which Jarling you are. The pick is remembered.
 func pick_profile(id: String) -> void:
 	if two_players or launch.active or not id in LaunchArgs.PROFILES or id == profile:
 		return
+	var was := lead_jarling()
 	profile = id
 	LauncherState.set_profile(Save, id)
 	Save.flush()
+	Roster.profile_override = id   # that profile's picks
+	Roster.reload()
 	Audio.play("ui_confirm")
+	# You stay where you are: the two Jarlings trade places, then show the new profile's picks.
+	var now := lead_jarling()
+	var at := [was.position, was.rotation.y]
+	was.position = now.position
+	was.rotation.y = now.rotation.y
+	now.position = at[0]
+	now.rotation.y = at[1]
+	was.stop()
+	now.stop()
 	_apply_roles()
-	lead_jarling().cheer()
+	apply_characters(true, true)
 	_update_focus(true)
 
 
@@ -256,6 +292,8 @@ func _process(delta: float) -> void:
 		_read_players()
 		if _dev_combo.update(Input.is_action_pressed("launcher_lb"), Input.is_action_pressed("launcher_rb"), delta):
 			_toggle_dev()
+	for j in jarlings:
+		j.hint_enabled = screen == Screen.HUB and not launch.active and j.follow == null
 	if launch.active:
 		for beat in launch.advance(delta):
 			_on_launch_beat(beat)
@@ -273,6 +311,7 @@ func _process(delta: float) -> void:
 func _read_players() -> void:
 	for player: int in [Players.P1, Players.P2]:
 		var j := jarling_for(player)
+		var change := _change_just_pressed(player)
 		if j == null:
 			for a: String in Players.ACTIONS:   # P2 keys with no pad: any press joins
 				if Input.is_action_just_pressed(Players.action(player, a)) and not _same_key_as_p1(a):
@@ -294,6 +333,89 @@ func _read_players() -> void:
 				j.cheer(0.6)
 			else:
 				pick_profile(LaunchArgs.PROFILES[1 - index_of_profile(profile)])
+		if change:
+			change_character(player)
+
+
+## Edge of the change button for `player`: their key, or Back on their own pad (read by device, so
+## one pad's Back never changes the other player's character). Updated every frame, held or not.
+func _change_just_pressed(player: int) -> bool:
+	var down := Input.is_action_pressed(Players.action(player, "change"))
+	var dev := Players.device_of(player)
+	if dev >= 0 and Input.is_joy_button_pressed(dev, CHANGE_BUTTON):
+		down = true
+	var edge := down and not _change_down[player]
+	_change_down[player] = down
+	return edge
+
+
+## The in-line chooser. Cycles `player`'s Roster pick in roster order. Two players: the other
+## player's pick is skipped (nobody free: a head shake and a low sound). Solo: the tag-along friend is
+## nobody's pick in play, so cycling onto it trades with it. Works anywhere in the hub except during
+## the launch (and while that Jarling is mid-jump or mid-swap). True if the character changed.
+func change_character(player: int) -> bool:
+	var j := jarling_for(player)
+	if j == null or j.busy or j.swapping or launch.active or screen != Screen.HUB:
+		return false
+	var now := Roster.pick(player)
+	var to := Roster.next_free(player, 1)
+	if not two_players:
+		var list := Roster.roster()
+		to = list[(list.find(now) + 1) % list.size()] if not list.is_empty() else now
+	if to == now or not Roster.set_pick(player, to, not two_players):
+		Audio.play("ui_back")
+		j.shake()
+		return false
+	apply_characters(true)
+	if not Roster.bark(to):
+		Audio.play(CHANGE_SOUND)
+	return true
+
+
+## A Roster character's model, or null if it has none (the hub then keeps the fallback body).
+func character_scene(id: String) -> PackedScene:
+	var who := Roster.info(id)
+	if who.is_empty() or who.glb == "" or not ResourceLoader.exists(who.glb):
+		return null
+	return load(who.glb) as PackedScene
+
+
+## Dress the held Jarlings as the picks: player 1's Jarling (the lead) is Roster.pick(P1), the other
+## one (player 2's, or the tag-along) Roster.pick(P2). animate: the chooser's swap for the ones that
+## change (and for the lead even if unchanged when `always_lead`, the profile swap's "it's you" pop).
+## Then hide any resident who is now on screen twice.
+func apply_characters(animate: bool = false, always_lead: bool = false) -> void:
+	var lead := lead_jarling()
+	for j in jarlings:
+		var id := Roster.pick(Players.P1 if j == lead else Players.P2)
+		var scene := character_scene(id)
+		if scene == null:
+			if j.character_id != "":
+				j.set_character("", MODELS[j.profile_id])
+			continue
+		if j.character_id == id and not (animate and always_lead and j == lead):
+			continue
+		if animate and not j.busy:
+			j.swap_to(id, scene, str(Roster.info(id).name))
+		else:
+			j.set_character(id, scene)
+	_update_residents()
+	_update_hints()
+
+
+func _update_residents() -> void:
+	for r in residents:
+		r.visible = jarlings.all(func(j: HubJarling) -> bool: return j.character_id != r.character_id)
+
+
+## "<button> Change" by each held ring: Select on a pad, the player's key with no pad at all.
+func _update_hints() -> void:
+	var pads := not Input.get_connected_joypads().is_empty()
+	for p: int in [Players.P1, Players.P2]:
+		var j := jarling_for(p)
+		if j != null:
+			var key := "Tab" if p == Players.P1 else "/"
+			j.set_hint_text("%s  Change" % ("Select" if Players.device_of(p) >= 0 or pads else key))
 
 
 ## Before any pad joins, P1 and P2 pad events both match every device; only the keyboard can tell
@@ -360,7 +482,7 @@ func _launch(spot: GameSpot, j: HubJarling) -> void:
 	if not launch.start():
 		return
 	var entry := spot.entry
-	_launch_cmd = LaunchArgs.build(entry, j.profile_id)
+	_launch_cmd = LaunchArgs.build(entry, j.profile_id, current_chars())
 	LauncherState.set_last_card(Save, entry.slug)
 	if not two_players:
 		profile = j.profile_id
@@ -447,6 +569,8 @@ func _on_process_watch() -> void:
 		return
 	print("launcher: %s exited (code %d)" % [_running_slug, OS.get_process_exit_code(_pid)])
 	_pid = -1
+	Roster.reload()           # a pick changed inside the game shows up here
+	apply_characters()
 	_rescan(_running_slug)   # pick up games installed or updated meanwhile
 	_set_screen(Screen.HUB)
 	_input_from_ms = Time.get_ticks_msec() + RETURN_GRACE_MS
@@ -504,6 +628,15 @@ func _apply_window_policy(running: bool) -> void:
 	DisplayServer.window_set_mode(mode)
 	if not running:
 		DisplayServer.window_move_to_foreground()
+
+
+## The picks on screen, for the game's --p1-char= / --p2-char= (its Roster reads them first).
+func current_chars() -> Dictionary:
+	var out := {}
+	for p: int in [Players.P1, Players.P2]:
+		if Roster.pick(p) != "":
+			out[p] = Roster.pick(p)
+	return out
 
 
 static func _ensure_executable(path: String) -> void:
@@ -632,6 +765,8 @@ func _build_sky_and_lights() -> void:
 ## The default scripted tour for `--demo` (when HUB_DEMO is not set): the Jarling runs from jar to
 ## jar along the row and back, forever, and player 2 joins after a while. It never presses A.
 const DEMO_TOUR := "tour;9:p2"
+## Demo runs keep their picks here (fresh each run), never in the shared players.json.
+const DEMO_PICKS := "user://demo_players.json"
 
 
 ## HUB_DEMO wins; else `--demo` on the command line plays DEMO_TOUR; else nothing.
@@ -681,6 +816,8 @@ func _run_demo() -> void:
 				jarlings[_launcher_index].visible = false
 				_play_return(jarlings[_launcher_index])
 			"swap": pick_profile(LaunchArgs.PROFILES[1 - index_of_profile(profile)])
+			"change": change_character(Players.P1)    # the in-line chooser, as if Select was pressed
+			"change2": change_character(Players.P2)
 			"walk":
 				_demo_move = Vector2(float(d[2]), float(d[3]))
 				_demo_move_until = _clock + float(d[4])

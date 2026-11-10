@@ -42,3 +42,11 @@ func test_save_reads_profile_with_or_without_separator() -> void:
 	assert_str(save_script.profile_from_args(PackedStringArray(["--profile=p2"]), "p1")).is_equal("p2")
 	assert_str(save_script.profile_from_args(PackedStringArray(["-s", "x"]), "p1")).is_equal("p1")
 	assert_str(save_script.profile_from_args(PackedStringArray(["--profile=../x"]), "p1")).is_equal("p1")
+
+
+func test_picks_follow_the_profile_as_char_args() -> void:
+	var entry := {"binary": "/g/game", "args": PackedStringArray(["--x"])}
+	var out := LaunchArgs.build(entry, "p2", {0: "chuck", 1: "jeff"})
+	assert_array(Array(out.args)).contains_exactly(["--profile=p2", "--p1-char=chuck", "--p2-char=jeff", "--x"])
+	var odd := LaunchArgs.build(entry, "p1", {0: "../x", 1: ""})   # never a junk id on the command line
+	assert_array(Array(odd.args)).contains_exactly(["--profile=p1", "--x"])

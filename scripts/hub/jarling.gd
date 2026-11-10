@@ -1,6 +1,7 @@
 ## A Jarling in the hub: walks and runs where the stick says, follows its friend, cheers, jumps into jars.
-## The two profile Jarlings (a grown-up and a kid, generic kit Jarlings) are the ones players hold;
-## Jeff and Chuck use the same class as residents that just stand about and cheer.
+## The two held Jarlings are the players' Roster picks; swap_to() changes who one is in place, with
+## the chooser's squash / poof / pop and a name tag. Residents use the same class and just stand about
+## and cheer. A held Jarling that stands still for a moment shows the "change" hint by its ring.
 ## The model comes from openjar-characters (idle / run / cheer / kick, faces +Z, feet at y = 0).
 class_name HubJarling
 extends Node3D
@@ -11,6 +12,12 @@ const RUN_FROM := 0.85             # stick tilt where the walk starts turning in
 const ACCEL := 14.0                # how fast it gets up to speed and stops: snappy, never icy
 const FOLLOW_SPEED := 5.2
 const TURN_RATE := 12.0
+const SWAP_SQUASH := 0.07          # chooser swap: squash, become the next one in a poof, pop past full size
+const SWAP_POP := 0.32
+const TAG_SECONDS := 1.5           # the name tag over your head after a swap
+const HINT_AFTER := 1.4            # standing still this long shows the "change" hint by the ring
+const INK := Color("2b2140")
+const CREAM := Color("fff4dc")
 const EXPR := {"neutral": Vector3(0, 0, 0), "happy": Vector3(0.5, 0, 0),
 		"surprised": Vector3(0, 0.5, 0), "determined": Vector3(0.5, 0.5, 0)}
 
@@ -22,8 +29,11 @@ var face_point := Vector3.INF      # look here while standing still
 var busy := false                  # mid jump into / out of a jar
 var moving := false
 var jar_count := 0                 # jars on the plaza (the hub sets it), so it bumps into them
-var size := 1.15                   # model scale: the kid profile is smaller
+var size := 1.15                   # model scale
 var height := 1.6                  # top of the head above the feet, in world units
+var character_id := ""             # the Roster id it shows ("" = a generic fallback body)
+var swapping := false              # mid swap_to(): the chooser ignores presses until it lands
+var hint_enabled := false          # the hub allows the hint (held, in the hub, no launch playing)
 
 var _model: Node3D
 var _flip: Node3D                  # pivot at the tummy, so a somersault turns about the middle
@@ -34,16 +44,71 @@ var _current := ""
 var _held := false
 var _clock := 0.0
 var _vel := Vector3.ZERO
+var _shape_tween: Tween
+var _tag: Label3D
+var _tag_tween: Tween
+var _hint: Label3D
+var _still := 0.0
 
 
 func setup(model_scene: PackedScene, id: String, ring_color: Color, model_size: float = 1.15) -> void:
 	profile_id = id
 	color = ring_color
 	size = model_size
-	_model = model_scene.instantiate()
-	height = JarWorld.bounds(_model).end.y * size
 	_flip = Node3D.new()
 	add_child(_flip)
+	_set_model(model_scene)
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.42
+	torus.outer_radius = 0.56
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = color
+	mat.emission_enabled = true
+	mat.emission = color
+	mat.emission_energy_multiplier = 1.6
+	_ring = MeshInstance3D.new()
+	_ring.mesh = torus
+	_ring.material_override = mat
+	_ring.scale = Vector3(1, 0.1, 1)
+	_ring.position.y = 0.03
+	_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_ring)
+	_tag = _label(64, 16)
+	_tag.visible = false
+	_hint = _label(34, 10)
+	_hint.top_level = true          # stays on the floor in front of the ring whichever way it faces
+	_hint.modulate.a = 0.0
+	_hint.visible = false
+	_play("idle")
+
+
+func _label(font_size: int, outline: int) -> Label3D:
+	var l := Label3D.new()
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.no_depth_test = true
+	l.shaded = false
+	l.double_sided = true
+	l.font_size = font_size
+	l.outline_size = outline
+	l.pixel_size = 0.006
+	l.modulate = CREAM
+	l.outline_modulate = INK
+	l.render_priority = 2
+	l.outline_render_priority = 1
+	add_child(l)
+	return l
+
+
+## Put a new body in (no animation). Keeps the ring, the tag and the pose state.
+func _set_model(model_scene: PackedScene) -> void:
+	if _model != null:
+		_flip.remove_child(_model)
+		_model.queue_free()
+	_face_mats.clear()
+	_anim = null
+	_current = ""
+	_model = model_scene.instantiate()
+	height = JarWorld.bounds(_model).end.y * size
 	_flip.position.y = height * 0.5
 	_flip.add_child(_model)
 	_model.position.y = -height * 0.5
@@ -66,22 +131,122 @@ func setup(model_scene: PackedScene, id: String, ring_color: Color, model_size: 
 			mi.set_surface_override_material(s, m)
 			if m.resource_name.ends_with("_face"):
 				_face_mats.append(m)
-	var torus := TorusMesh.new()
-	torus.inner_radius = 0.42
-	torus.outer_radius = 0.56
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
-	mat.emission_enabled = true
-	mat.emission = color
-	mat.emission_energy_multiplier = 1.6
-	_ring = MeshInstance3D.new()
-	_ring.mesh = torus
-	_ring.material_override = mat
-	_ring.scale = Vector3(1, 0.1, 1)
-	_ring.position.y = 0.03
-	_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(_ring)
+
+
+## Become `id` at once (boot, coming back from a game). No sound, no poof.
+func set_character(id: String, model_scene: PackedScene) -> void:
+	_kill_shape_tween()
+	character_id = id
+	_set_model(model_scene)
 	_play("idle")
+
+
+## The in-line chooser's swap, same beats as the template podiums: squash (70 ms), turn into `id` at
+## the bottom in a cream poof, pop past full size (TRANS_BACK, 320 ms), and the name tag pops up over
+## the head for TAG_SECONDS. The hub plays the bark / sound.
+func swap_to(id: String, model_scene: PackedScene, tag_text: String) -> void:
+	_kill_shape_tween()
+	swapping = true
+	character_id = id   # who it is now (the hub hides a twin resident at once); the body follows
+	_shape_tween = create_tween()
+	_shape_tween.tween_property(_model, "scale", Vector3(1.2, 0.7, 1.2) * size, SWAP_SQUASH)
+	await _shape_tween.finished
+	if not is_inside_tree():
+		return
+	_set_model(model_scene)
+	_model.scale = Vector3(1.3, 0.15, 1.3) * size
+	HubJarling.poof(self, Vector3(0, height * 0.35, 0), color)
+	show_tag(tag_text)
+	set_expression("happy")
+	_play("cheer")
+	_shape_tween = create_tween()
+	_shape_tween.tween_property(_model, "scale", Vector3.ONE * size, SWAP_POP) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	await _shape_tween.finished
+	swapping = false
+	await get_tree().create_timer(0.4).timeout
+	set_expression("neutral")
+	if _current == "cheer" and not busy:
+		_play("idle")
+
+
+## The name over the head: pops in past full size, holds, fades out. A new one restarts it.
+func show_tag(text: String) -> void:
+	if _tag_tween != null:
+		_tag_tween.kill()
+	_tag.text = text
+	_tag.outline_modulate = INK.lerp(color, 0.35) if _held else INK
+	_tag.position = Vector3(0, height + 0.45, 0)
+	_tag.visible = true
+	_tag.modulate.a = 1.0
+	_tag.scale = Vector3.ONE * 0.2
+	_tag_tween = create_tween()
+	_tag_tween.tween_property(_tag, "scale", Vector3.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_tag_tween.tween_interval(TAG_SECONDS - 0.5)
+	_tag_tween.tween_property(_tag, "modulate:a", 0.0, 0.25)
+	_tag_tween.tween_callback(_tag.hide)
+
+
+func tag_visible() -> bool:
+	return _tag.visible
+
+
+func hint_visible() -> bool:
+	return _hint.visible and _hint.modulate.a > 0.5
+
+
+## Nobody else to be: a quick no-no head shake (the hub plays the low sound).
+func shake() -> void:
+	var t := create_tween()
+	for k in [0.35, -0.35, 0.2, 0.0]:
+		t.tween_property(_flip, "rotation:z", k, 0.06)
+
+
+## A burst of cream puffs from `at` (local to `parent`), freed after 0.45 s.
+static func poof(parent: Node3D, at: Vector3, tint: Color = Color.WHITE) -> Node3D:
+	var root := Node3D.new()
+	root.name = "Poof"
+	root.position = at
+	parent.add_child(root)
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = CREAM.lerp(tint, 0.18)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	var puffs: Array[MeshInstance3D] = []
+	for i in 9:
+		var mi := MeshInstance3D.new()
+		var sphere := SphereMesh.new()
+		sphere.radius = 0.5
+		sphere.height = 1.0
+		sphere.radial_segments = 12
+		sphere.rings = 6
+		mi.mesh = sphere
+		mi.material_override = mat
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		root.add_child(mi)
+		puffs.append(mi)
+	var pose := func(t: float) -> void:
+		for i in puffs.size():
+			var ang := TAU * i / puffs.size() + 0.35
+			var d := lerpf(0.25, 1.25, t) * (1.0 if i % 2 == 0 else 0.8)
+			puffs[i].position = Vector3(cos(ang) * d, sin(ang) * d * 0.6 + 0.3 * t, sin(ang * 2.0) * 0.25)
+			puffs[i].scale = Vector3.ONE * lerpf(0.62, 0.16, t) * (1.0 if i % 2 == 0 else 0.75)
+		mat.albedo_color.a = 1.0 - smoothstep(0.55, 1.0, t)
+	pose.call(0.0)
+	if root.is_inside_tree():
+		var tw := root.create_tween()
+		tw.tween_method(pose, 0.0, 1.0, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_callback(root.queue_free)
+	return root
+
+
+func _kill_shape_tween() -> void:
+	if _shape_tween != null and _shape_tween.is_valid():
+		_shape_tween.kill()
+	_shape_tween = null
+	swapping = false
+	if _model != null:
+		_model.scale = Vector3.ONE * size
 
 
 func set_expression(e: String) -> void:
@@ -180,6 +345,7 @@ func jump_out(mouth: Vector3, stand: Vector3) -> void:
 func _process(delta: float) -> void:
 	_clock += delta
 	_ring.scale = Vector3(1, 0.1, 1) * (1.0 + sin(_clock * 4.0) * 0.04)
+	_update_hint(delta)
 	if busy:
 		return
 	var vel := Vector3.ZERO
@@ -209,6 +375,25 @@ func _process(delta: float) -> void:
 		_anim.speed_scale = clampf(vel.length() / 3.6, 0.8, 2.2)
 
 
+## The "change" hint: fades in on the floor just in front of the ring once you have stood still
+## for HINT_AFTER seconds, and is gone the moment you move, swap, jump or a launch starts.
+func _update_hint(delta: float) -> void:
+	var calm := hint_enabled and _held and not busy and not moving and not swapping and visible \
+			and move_input.length() < 0.2
+	_still = _still + delta if calm else 0.0
+	var want := 1.0 if _still >= HINT_AFTER else 0.0
+	_hint.modulate.a = move_toward(_hint.modulate.a, want, delta * (3.0 if want > 0.0 else 12.0))
+	_hint.visible = _hint.modulate.a > 0.01
+	if _hint.visible:
+		_hint.global_position = global_position + Vector3(0, 0.08, 0.9)
+
+
+## What the hint says: "<button> Change". The hub sets it (keyboard players see their key).
+func set_hint_text(text: String) -> void:
+	_hint.text = text
+	_hint.outline_modulate = INK.lerp(color, 0.45)
+
+
 ## Full analogue control: a small tilt tiptoes, most of the way walks, all the way over runs.
 static func stick_velocity(v: Vector2) -> Vector3:
 	var tilt := minf(v.length(), 1.0)
@@ -229,7 +414,11 @@ func _play(a: String) -> void:
 
 
 func _squash() -> void:
+	if swapping:
+		return
+	_kill_shape_tween()
 	var t := create_tween().set_trans(Tween.TRANS_SINE)
+	_shape_tween = t
 	t.tween_property(_model, "scale", Vector3(1.13, 0.8, 1.13) * size, 0.07)
 	t.tween_property(_model, "scale", Vector3(0.92, 1.1, 0.92) * size, 0.1)
 	t.tween_property(_model, "scale", Vector3.ONE * size, 0.14)
