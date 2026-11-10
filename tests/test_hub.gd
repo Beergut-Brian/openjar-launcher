@@ -473,6 +473,8 @@ func test_two_players_skip_the_other_pick() -> void:
 
 
 func test_two_players_and_nobody_free_shakes_and_stays() -> void:
+	Roster.data_path = "res://tests/fixtures/roster_two.json"   # Jeff and Chuck only
+	Roster.reload()
 	var hub := await _hub(_fixture(2))
 	hub.join_second_player()
 	assert_bool(hub.change_character(Players.P1)).is_false()
@@ -495,6 +497,8 @@ func test_a_resident_who_is_on_screen_already_is_hidden() -> void:
 
 
 func test_profile_swap_switches_to_that_profiles_picks_in_place() -> void:
+	Roster.data_path = "res://tests/fixtures/roster_two.json"   # Jeff and Chuck only: the change swaps to the other one
+	Roster.reload()
 	_write_picks({"p1": {"P1": "jeff", "P2": "chuck"}, "p2": {"P1": "chuck", "P2": "jeff"}})
 	var hub := await _hub(_fixture(2))
 	var at: Vector3 = hub.lead_jarling().position
