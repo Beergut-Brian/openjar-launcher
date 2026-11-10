@@ -473,6 +473,8 @@ func test_two_players_skip_the_other_pick() -> void:
 
 
 func test_two_players_and_nobody_free_shakes_and_stays() -> void:
+	Roster.data_path = "res://tests/fixtures/roster_two.json"   # Jeff and Chuck only
+	Roster.reload()
 	var hub := await _hub(_fixture(2))
 	hub.join_second_player()
 	assert_bool(hub.change_character(Players.P1)).is_false()
