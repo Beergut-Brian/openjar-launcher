@@ -13,12 +13,16 @@ row of game cards. Pick one, it launches. When the game quits, you are back here
 - Profile picker: two faces, no names. Picks which `--profile=` the game gets.
 
 ## Controls
+Kaden, 2026-11-10: "On the launcher, I want to be able to run around." The hub is free roam; there
+is no shortcut that runs you to a jar.
+
 | Input | Does |
 | --- | --- |
-| Left stick / D-pad | Move between cards |
-| A | Launch the highlighted game (or skip the intro) |
-| B | Back to the card row from the profile picker |
-| Hold LB + RB for 1 s | Toggle showing the `(dev)` builds (badge in the corner of the card) |
+| Left stick / D-pad / arrow keys | Walk anywhere on the island, any direction; all the way over runs |
+| (walk up to a jar) | It comes into focus: `ui_move`, the jar bounces, its lid lifts and your pad lights |
+| A | At a jar in focus: jump in and launch it. Anywhere else: a happy cheer |
+| B | Solo: be the other Jarling (the profile pick). Two players: a cheer |
+| Hold LB + RB for 1 s | Toggle showing the `(dev)` builds (their jars wear a dark lid) |
 | Start | Quit to Steam |
 
 ## Core loop
@@ -89,6 +93,17 @@ installed (Smash Party via its kiosk shortcut counts), launches one, comes back.
 - 2026-11-09: A in the profile picker holds the picked (happy) face for 0.35 s before the card row.
 - 2026-11-09: fallback card tiles never repeat on neighbouring cards; a game keeps its own tile
   unless the card next to it already has it.
+
+- 2026-11-10 (free roam): the stick is fully analogue; a small tilt walks slowly, most of the way walks
+  at 4.4 m/s, and the last 15 % of tilt (or the D-pad / keys) ramps up to a 7 m/s run. Starting and
+  stopping take about a tenth of a second, so it never feels icy.
+- 2026-11-10 (free roam): a jar is in focus when you are within 1.7 m of the strip from its stand pad to
+  the jar itself (so walking up to the front or bumping its side both count), and it stays in focus
+  until you are 0.6 m further out, so it never flickers at the edge.
+- 2026-11-10 (free roam): jars are solid. The row of plinths is one smooth curved wall you slide along,
+  so running sideways along the row never gets stuck between two jars.
+- 2026-11-10 (free roam): with the hop gone, nothing wobbles at the ends of the row any more; the
+  island edge just stops you. `--demo` (and `HUB_DEMO=tour`) walks a tour from jar to jar, never pressing A.
 
 ## Open questions
 - Logo and jar design: Kaden approves the Art lane's three options.

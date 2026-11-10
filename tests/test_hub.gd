@@ -1,4 +1,4 @@
-## End to end through hub.tscn: jars from the 0/1/2/8 fixtures, the stick hop, launching a fake game
+## End to end through hub.tscn: jars from the 0/1/2/8 fixtures, walking up to jars, launching a fake game
 ## and coming back, and picking a Jarling (profile). Uses a throwaway Save profile.
 class_name TestHub
 extends GdUnitTestSuite
@@ -27,7 +27,7 @@ func after_test() -> void:
 	Save.profile = _saved_profile
 	Save._load()
 	OS.set_environment("OPENJAR_ROOT", _saved_env)
-	for a in ["p1_move_left", "p1_move_right", "p1_action", "p1_jump"]:
+	for a in ["p1_move_left", "p1_move_right", "p1_move_up", "p1_move_down", "p1_action", "p1_jump"]:
 		Input.action_release(a)
 	OS.low_processor_usage_mode = false
 	if root.is_empty():
@@ -87,6 +87,47 @@ func _push(action: String, hold: float = 0.08) -> void:
 	await _wait(hold)
 	Input.action_release(action)
 	await get_tree().process_frame
+
+
+const DT := 1.0 / 60.0
+const MOVES := ["p1_move_left", "p1_move_right", "p1_move_up", "p1_move_down"]
+
+
+## Simulated time: the hub and its Jarlings are stepped by hand at 60 fps, so walking is the same
+## on a slow test box as on the TV. The tree does not process them meanwhile.
+func _step(hub: Node3D, seconds: float, until: Callable = Callable()) -> float:
+	hub.process_mode = Node.PROCESS_MODE_DISABLED
+	var t := 0.0
+	while t < seconds and not (until.is_valid() and until.call()):
+		hub._process(DT)
+		for j: HubJarling in hub.jarlings:
+			j._process(DT)
+		t += DT
+	hub.process_mode = Node.PROCESS_MODE_INHERIT
+	return t
+
+
+## Push the stick (the real move actions, with analogue strength) like a kid would.
+func _stick(v: Vector2) -> void:
+	var s := [maxf(-v.x, 0.0), maxf(v.x, 0.0), maxf(-v.y, 0.0), maxf(v.y, 0.0)]
+	for i in 4:
+		if s[i] > 0.0:
+			Input.action_press(MOVES[i], s[i])
+		else:
+			Input.action_release(MOVES[i])
+
+
+## Steer player 1's Jarling to jar `index` with the stick until it comes into focus, then let go.
+func _walk_to_jar(hub: Node3D, index: int) -> float:
+	var t := 0.0
+	var lead: HubJarling = hub.lead_jarling()
+	while hub.focus[hub.jarlings.find(lead)] != index and t < 8.0:
+		var to: Vector3 = hub.spots[index].stand_point - lead.position
+		_stick(Vector2(to.x, to.z).normalized())
+		t += _step(hub, 0.1)
+	_stick(Vector2.ZERO)
+	_step(hub, 0.3)
+	return t
 
 
 func _wait(seconds: float) -> void:
@@ -161,25 +202,97 @@ func test_remembered_jar_is_where_you_start() -> void:
 	assert_int(hub.focus[0]).is_equal(5)
 
 
-func test_stick_hop_order() -> void:
+func test_holding_right_walks_past_the_jars_instead_of_snapping() -> void:
 	var hub := await _hub(_fixture(8))
+	var j: HubJarling = hub.jarlings[0]
 	assert_int(hub.focus[0]).is_equal(3)
-	await _push("p1_move_right")
-	await _wait(0.5)
-	assert_int(hub.focus[0]).is_equal(4)
-	for i in 2:
-		await _push("p1_move_left")
-		await _wait(0.5)
-	assert_int(hub.focus[0]).is_equal(2)
-	# holding the stick keeps hopping, and stops at the end of the row
-	Input.action_press("p1_move_left")
-	await _wait(2.2)
-	Input.action_release("p1_move_left")
-	await _wait(0.5)
-	assert_int(hub.focus[0]).is_equal(0)
-	assert_vector(hub.jarlings[0].position).is_equal_approx(HubLayout.stand_position(0, 8), Vector3.ONE * 0.01)
+	Input.action_press("p1_move_right")
+	var t := _step(hub, 3.0, func() -> bool: return hub.focus[0] == 4)
+	assert_int(hub.focus[0]).is_equal(4)                  # walked up to the next jar: in focus
+	assert_float(t).is_less(1.5)
+	assert_bool(j.moving).is_true()                       # and it keeps going: no stop at the jar
+	_step(hub, 0.5)
+	assert_float(j.position.distance_to(HubLayout.stand_position(4, 8))).is_greater(0.5)
+	_step(hub, 4.0)                                       # all the way over: past the row's end
+	Input.action_release("p1_move_right")
+	_step(hub, 0.5)
+	assert_bool(j.moving).is_false()
+	assert_float(j.position.length()).is_less_equal(HubLayout.WALK_RADIUS + 0.001)
+	assert_float(j.position.x).is_greater(HubLayout.stand_position(7, 8).x)
 	# the tag-along friend never takes a jar of its own
 	assert_int(hub.focus[1]).is_equal(-1)
+
+
+func test_full_tilt_runs_and_a_small_tilt_walks() -> void:
+	var hub := await _hub(_fixture(1))
+	var j: HubJarling = hub.jarlings[0]
+	_stick(Vector2(0, 1))                                 # towards the camera, away from the jar
+	_step(hub, 1.0)
+	var run := j.position.z - HubLayout.stand_position(0, 1).z
+	hub.set_entries(hub.entries)
+	_stick(Vector2(0, 0.45))
+	var tilt := Players.move_vector(Players.P1).length()   # after the stick's deadzone
+	_step(hub, 1.0)
+	_stick(Vector2.ZERO)
+	var walk := j.position.z - HubLayout.stand_position(0, 1).z
+	assert_float(run).is_between(HubJarling.RUN_SPEED * 0.8, HubJarling.RUN_SPEED)
+	assert_float(tilt).is_between(0.2, HubJarling.RUN_FROM)
+	assert_float(walk).is_between(tilt * HubJarling.WALK_SPEED * 0.8, tilt * HubJarling.WALK_SPEED)
+
+
+func test_every_direction_walks_and_jars_are_solid() -> void:
+	var hub := await _hub(_fixture(2))
+	var j: HubJarling = hub.jarlings[0]
+	var start := j.position
+	for v: Vector2 in [Vector2(0, 1), Vector2(-1, 0), Vector2(0.7, 0.7)]:
+		hub.set_entries(hub.entries)
+		_stick(v)
+		_step(hub, 0.6)
+		_stick(Vector2.ZERO)
+		var moved := Vector2(j.position.x - start.x, j.position.z - start.z)
+		assert_float(moved.length()).is_greater(1.5)
+		assert_float(moved.normalized().dot(v.normalized())).is_greater(0.95)
+	# run straight at the jar: it bumps into the plinth, stays out of the glass, and the jar is in focus
+	hub.set_entries(hub.entries)
+	_stick(Vector2(0, -1))
+	_step(hub, 2.0)
+	_stick(Vector2.ZERO)
+	_step(hub, 0.3)
+	var jar: Vector3 = hub.spots[0].position
+	assert_float(Vector2(j.position.x - jar.x, j.position.z - jar.z).length()).is_greater_equal(HubLayout.BLOCK_RADIUS - 0.01)
+	assert_int(hub.focus[0]).is_equal(0)
+
+
+func test_walk_away_then_walk_up_to_another_jar_to_focus_it() -> void:
+	var hub := await _hub(_fixture(8))
+	_stick(Vector2(0, 1))
+	_step(hub, 1.0)
+	_stick(Vector2.ZERO)
+	_step(hub, 0.3)
+	assert_int(hub.focus[0]).is_equal(-1)                 # roaming: A just cheers
+	assert_dict(hub.selected_entry()).is_empty()
+	assert_float(_walk_to_jar(hub, 6)).is_less(3.0)
+	assert_int(hub.focus[0]).is_equal(6)
+	assert_bool(hub.spots[6].highlighted).is_true()
+	assert_str(hub.selected_entry().slug).is_equal(hub.spots[6].entry.slug)
+
+
+func test_demo_walks_between_jars() -> void:
+	assert_str(load("res://scripts/hub/hub.gd").demo_script("", PackedStringArray(["--demo"]))).is_not_empty()
+	assert_str(load("res://scripts/hub/hub.gd").demo_script("", PackedStringArray())).is_empty()
+	assert_str(load("res://scripts/hub/hub.gd").demo_script("go:1", PackedStringArray(["--demo"]))).is_equal("go:1")
+	var hub := await _hub(_fixture(8))
+	hub._parse_demo("go:6")
+	_step(hub, 4.0, func() -> bool: return hub.focus[0] == 6 and not hub.jarlings[0].moving)
+	assert_int(hub.focus[0]).is_equal(6)
+	assert_float(hub.jarlings[0].position.distance_to(hub.spots[6].stand_point)).is_less(1.0)
+	hub._parse_demo("tour")                               # keeps going to the next jar and on
+	var seen := {}
+	_step(hub, 12.0, func() -> bool:
+		if hub.focus[0] >= 0:
+			seen[hub.focus[0]] = true
+		return seen.size() >= 3)
+	assert_int(seen.size()).is_greater_equal(3)
 
 
 func test_launch_hand_off_return_and_profile_pick() -> void:
@@ -187,8 +300,7 @@ func test_launch_hand_off_return_and_profile_pick() -> void:
 	var hub := await _hub(root)
 	assert_int(hub.spots.size()).is_equal(2)
 	assert_str(hub.profile).is_equal("p1")
-	await _push("p1_move_right")
-	await _wait(0.5)
+	_walk_to_jar(hub, 1)
 	assert_str(hub.selected_entry().slug).is_equal("b-game")
 
 	var fired := [0]
@@ -229,8 +341,7 @@ func test_launch_hand_off_return_and_profile_pick() -> void:
 	assert_object(hub.lead_jarling()).is_same(hub.jarlings[1])
 	assert_object(hub.jarlings[0].follow).is_same(hub.jarlings[1])
 	await _wait(0.2)
-	hub.hop(Players.P1, 1)                            # the kid runs up to the same jar
-	await _wait(0.6)
+	_walk_to_jar(hub, 1)                               # the kid walks up to the same jar
 	await _tap("p1_action")
 	await _wait_for_screen(hub, hub.Screen.RUNNING, 4.0)
 	await _wait_for_screen(hub, hub.Screen.HUB, 5.0)

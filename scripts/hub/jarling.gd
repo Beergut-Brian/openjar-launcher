@@ -1,27 +1,27 @@
-## A Jarling in the hub: walks, runs to a jar on a hop, follows its friend, cheers, jumps into jars.
+## A Jarling in the hub: walks and runs where the stick says, follows its friend, cheers, jumps into jars.
 ## The two profile Jarlings (a grown-up and a kid, generic kit Jarlings) are the ones players hold;
 ## Jeff and Chuck use the same class as residents that just stand about and cheer.
 ## The model comes from openjar-characters (idle / run / cheer / kick, faces +Z, feet at y = 0).
 class_name HubJarling
 extends Node3D
 
-const WALK_SPEED := 4.4
-const HOP_SPEED := 9.0
+const WALK_SPEED := 4.4            # stick most of the way over
+const RUN_SPEED := 7.0             # stick (or D-pad / keys) all the way over: a run
+const RUN_FROM := 0.85             # stick tilt where the walk starts turning into a run
+const ACCEL := 14.0                # how fast it gets up to speed and stops: snappy, never icy
 const FOLLOW_SPEED := 5.2
 const TURN_RATE := 12.0
 const EXPR := {"neutral": Vector3(0, 0, 0), "happy": Vector3(0.5, 0, 0),
 		"surprised": Vector3(0, 0.5, 0), "determined": Vector3(0.5, 0.5, 0)}
 
-signal arrived()
-
 var profile_id := "p1"
 var color := Color.WHITE
 var move_input := Vector2.ZERO     # stick, set by the hub each frame (x right, y towards the camera)
-var hop_goal := Vector3.INF        # set = running to a jar, the stick is ignored until it gets there
 var follow: HubJarling = null      # set = nobody holds this Jarling, it tags along
 var face_point := Vector3.INF      # look here while standing still
 var busy := false                  # mid jump into / out of a jar
 var moving := false
+var jar_count := 0                 # jars on the plaza (the hub sets it), so it bumps into them
 var size := 1.15                   # model scale: the kid profile is smaller
 var height := 1.6                  # top of the head above the feet, in world units
 
@@ -33,6 +33,7 @@ var _face_mats: Array[StandardMaterial3D] = []
 var _current := ""
 var _held := false
 var _clock := 0.0
+var _vel := Vector3.ZERO
 
 
 func setup(model_scene: PackedScene, id: String, ring_color: Color, model_size: float = 1.15) -> void:
@@ -98,8 +99,10 @@ func cheer(seconds: float = 0.9) -> void:
 		_play("idle")
 
 
-func hop_to(goal: Vector3) -> void:
-	hop_goal = goal
+## Stand still now (the hub just placed it somewhere): no stick, no leftover speed.
+func stop() -> void:
+	move_input = Vector2.ZERO
+	_vel = Vector3.ZERO
 
 
 ## Top of the head (global): where a flown-off jar lid lands.
@@ -113,7 +116,7 @@ func head_top() -> Vector3:
 func launch_pose(t: float, start: Vector3, mouth: Vector3, inside: Vector3) -> void:
 	var L := LaunchSequence
 	busy = true
-	hop_goal = Vector3.INF
+	_vel = Vector3.ZERO
 	_ring.visible = t < L.T_LEAP and _held
 	var to_jar := atan2(mouth.x - start.x, mouth.z - start.z)
 	var shape := Vector3.ONE
@@ -161,6 +164,7 @@ func jump_out(mouth: Vector3, stand: Vector3) -> void:
 	_model.position.y = -height * 0.5
 	set_expression("happy")
 	_play("cheer")
+	_vel = Vector3.ZERO
 	var arc := func(k: float) -> void:
 		global_position = mouth.lerp(stand, k) + Vector3(0, sin(k * PI) * 2.2, 0)
 		_model.scale = Vector3.ONE * size * lerpf(0.45, 1.0, k)
@@ -179,29 +183,19 @@ func _process(delta: float) -> void:
 	if busy:
 		return
 	var vel := Vector3.ZERO
-	if hop_goal != Vector3.INF:
-		var to := hop_goal - global_position
-		to.y = 0.0
-		var step := HOP_SPEED * delta
-		if to.length() <= step:
-			global_position = hop_goal
-			hop_goal = Vector3.INF
-			_squash()
-			arrived.emit()
-		else:
-			vel = to.normalized() * HOP_SPEED
-	elif follow != null:
+	if follow != null:
 		var to := follow.global_position - global_position
 		to.y = 0.0
 		if to.length() > 1.9 and follow.visible:
 			vel = to.normalized() * minf(FOLLOW_SPEED, (to.length() - 1.5) * 4.0)
-	elif move_input.length() > 0.2:
-		vel = Vector3(move_input.x, 0.0, move_input.y) * WALK_SPEED
+	else:
+		vel = stick_velocity(move_input)
+	_vel = _vel.lerp(vel, 1.0 - exp(-delta * ACCEL))
+	if _vel.length() < 0.05 and vel == Vector3.ZERO:
+		_vel = Vector3.ZERO
+	vel = _vel
 	if vel != Vector3.ZERO:
-		var p := global_position + vel * delta
-		p.y = 0.0
-		var flat := Vector2(p.x, p.z).limit_length(HubLayout.WALK_RADIUS)
-		global_position = Vector3(flat.x, 0.0, flat.y)
+		global_position = HubLayout.walkable(global_position + vel * delta, jar_count)
 	moving = vel.length() > 0.3
 	var look := vel
 	if not moving and face_point != Vector3.INF:
@@ -213,6 +207,17 @@ func _process(delta: float) -> void:
 		_play("run" if moving else "idle")
 	if _anim != null and _current == "run":
 		_anim.speed_scale = clampf(vel.length() / 3.6, 0.8, 2.2)
+
+
+## Full analogue control: a small tilt tiptoes, most of the way walks, all the way over runs.
+static func stick_velocity(v: Vector2) -> Vector3:
+	var tilt := minf(v.length(), 1.0)
+	if tilt < 0.2:
+		return Vector3.ZERO
+	var speed := tilt * WALK_SPEED
+	if tilt > RUN_FROM:
+		speed = lerpf(RUN_FROM * WALK_SPEED, RUN_SPEED, (tilt - RUN_FROM) / (1.0 - RUN_FROM))
+	return Vector3(v.x, 0.0, v.y).normalized() * speed
 
 
 func _play(a: String) -> void:
