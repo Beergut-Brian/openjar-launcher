@@ -1,4 +1,4 @@
-## HubLayout: where the jars stand for 0/1/2/8 games and where a sideways push hops to.
+## HubLayout: where the jars stand for 0/1/2/8 games, which jar a Jarling has walked up to, where it can walk.
 class_name TestHubLayout
 extends GdUnitTestSuite
 
@@ -30,24 +30,47 @@ func test_focus_only_near_a_stand_point() -> void:
 	assert_int(HubLayout.focus_at(Vector3.ZERO, 0)).is_equal(-1)
 
 
-func test_hop_steps_one_jar_and_clamps_at_the_ends() -> void:
-	var pos := Vector3.ZERO
-	assert_int(HubLayout.hop_target(3, 1, pos, 8)).is_equal(4)
-	assert_int(HubLayout.hop_target(3, -1, pos, 8)).is_equal(2)
-	assert_int(HubLayout.hop_target(7, 1, pos, 8)).is_equal(7)
-	assert_int(HubLayout.hop_target(0, -1, pos, 8)).is_equal(0)
-	assert_int(HubLayout.hop_target(0, 1, pos, 1)).is_equal(0)
+func test_walking_up_to_the_front_or_the_side_of_a_jar_focuses_it() -> void:
+	var stand := HubLayout.stand_position(3, 8)
+	var jar := HubLayout.jar_position(3, 8)
+	# no exact spot: a bit short, a bit to the side, or right up against the glass all count
+	assert_int(HubLayout.focus_at(stand + Vector3(0.6, 0, 1.0), 8)).is_equal(3)
+	assert_int(HubLayout.focus_at(stand.lerp(jar, 0.6), 8)).is_equal(3)
+	var side := jar + (HubLayout.jar_position(4, 8) - jar).normalized() * HubLayout.BLOCK_RADIUS
+	assert_int(HubLayout.focus_at(HubLayout.walkable(side, 8), 8)).is_not_equal(-1)
+	# the middle of the plaza is roaming
+	assert_int(HubLayout.focus_at(Vector3(0, 0, 1), 8)).is_equal(-1)
 
 
-func test_hop_while_roaming_goes_to_the_nearest_jar_that_way() -> void:
-	var between := HubLayout.stand_position(2, 8).lerp(HubLayout.stand_position(3, 8), 0.4) + Vector3(0, 0, 1)
-	assert_int(HubLayout.hop_target(-1, 1, between, 8)).is_equal(3)
-	assert_int(HubLayout.hop_target(-1, -1, between, 8)).is_equal(2)
+func test_focus_holds_on_at_the_edge_of_its_range() -> void:
+	var stand := HubLayout.stand_position(0, 2)
+	var edge := stand + Vector3(0, 0, HubLayout.FOCUS_RANGE + HubLayout.FOCUS_HOLD * 0.5)
+	assert_int(HubLayout.focus_at(edge, 2)).is_equal(-1)          # walking in: not yet
+	assert_int(HubLayout.focus_at(edge, 2, 0)).is_equal(0)        # walking out: still yours
+	var gone := stand + Vector3(0, 0, HubLayout.FOCUS_RANGE + HubLayout.FOCUS_HOLD + 0.1)
+	assert_int(HubLayout.focus_at(gone, 2, 0)).is_equal(-1)
 
 
-func test_only_a_sideways_push_is_a_hop() -> void:
-	assert_bool(HubLayout.is_hop_push(Vector2(1, 0))).is_true()
-	assert_bool(HubLayout.is_hop_push(Vector2(-0.9, 0.3))).is_true()
-	assert_bool(HubLayout.is_hop_push(Vector2(0.7, 0.7))).is_false()
-	assert_bool(HubLayout.is_hop_push(Vector2(0, 1))).is_false()
-	assert_bool(HubLayout.is_hop_push(Vector2(0.3, 0))).is_false()
+func test_a_neighbour_takes_focus_only_when_clearly_nearer() -> void:
+	var a := HubLayout.stand_position(3, 8)
+	var b := HubLayout.stand_position(4, 8)
+	assert_int(HubLayout.focus_at(a.lerp(b, 0.55), 8, 3)).is_equal(3)
+	assert_int(HubLayout.focus_at(a.lerp(b, 0.9), 8, 3)).is_equal(4)
+
+
+func test_jarlings_bump_into_jars_and_stay_on_the_island() -> void:
+	for i in 8:
+		var jar := HubLayout.jar_position(i, 8)
+		var p := HubLayout.walkable(jar + Vector3(0.1, 0, 0.1), 8)
+		for k in 8:
+			assert_float(Vector2(p.x, p.z).distance_to(Vector2(HubLayout.jar_position(k, 8).x, HubLayout.jar_position(k, 8).z))).is_greater_equal(HubLayout.BLOCK_RADIUS - 0.05)
+	assert_float(HubLayout.walkable(Vector3(0, 0, 30), 8).length()).is_equal_approx(HubLayout.WALK_RADIUS, 0.001)
+	assert_vector(HubLayout.walkable(Vector3(1, 0, 2), 8)).is_equal(Vector3(1, 0, 2))   # open plaza: untouched
+
+
+func test_stick_is_analogue_and_full_tilt_runs() -> void:
+	assert_vector(HubJarling.stick_velocity(Vector2(0.1, 0))).is_equal(Vector3.ZERO)
+	assert_float(HubJarling.stick_velocity(Vector2(0.5, 0)).length()).is_equal_approx(0.5 * HubJarling.WALK_SPEED, 0.001)
+	assert_float(HubJarling.stick_velocity(Vector2(1, 0)).length()).is_equal_approx(HubJarling.RUN_SPEED, 0.001)
+	assert_float(HubJarling.stick_velocity(Vector2(0.71, 0.71)).length()).is_equal_approx(HubJarling.RUN_SPEED, 0.05)
+	assert_vector(HubJarling.stick_velocity(Vector2(0, -1)).normalized()).is_equal_approx(Vector3(0, 0, -1), Vector3.ONE * 0.001)

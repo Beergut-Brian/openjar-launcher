@@ -13,7 +13,8 @@ const RETURN_GRACE_MS := 600      # swallow the button that quit the game
 ## Minimise the launcher's window while a game runs and restore it (fullscreen) on return, so two
 ## fullscreen windows never fight for the TV. Off = the launcher only hides. GAME.md decisions.
 const MINIMIZE_WHILE_RUNNING := true
-const HOP_REPEAT := 0.45          # holding the stick sideways hops again this often
+const DEMO_STOP := 0.5            # --demo: a walking Jarling counts as "there" this close to the stand point
+const DEMO_PAUSE := 1.6           # --demo tour: how long it stands at each jar before walking on
 const INTRO_SECONDS := 2.6        # the camera glides in from the wide shot; input works throughout
 const SKY_SHADER := preload("res://assets/shaders/hub/sky.gdshader")
 ## Profile id → Jarling: two generic kit Jarlings, a grown-up and a kid. Not player-locked.
@@ -59,9 +60,6 @@ var _flash: ColorRect
 var _window_mode_before_run := -1
 var _input_from_ms := 0
 var _dev_combo := HoldCombo.new(1.0)
-var _hop_held := [false, false]
-var _hop_timer := [0.0, 0.0]
-var _hop_index := [-1, -1]
 var _intro := 0.0
 var _intro_hold := false
 var _cam_pos := Vector3(0, 10.5, 27)
@@ -70,6 +68,10 @@ var _clock := 0.0
 var _demo: Array = []
 var _demo_move := Vector2.ZERO
 var _demo_move_until := 0.0
+var _demo_goal: Array[int] = [-1, -1]   # by player: the jar a "go" command is walking to
+var _demo_tour := false
+var _demo_tour_dir := 1
+var _demo_rest := 0.0
 
 @onready var camera: Camera3D = $Camera
 @onready var world: Node3D = $World
@@ -109,7 +111,7 @@ func _ready() -> void:
 	_rescan(LauncherState.last_card(Save))
 	process_watch.wait_time = POLL_SECONDS
 	process_watch.timeout.connect(_on_process_watch)
-	_parse_demo(OS.get_environment("HUB_DEMO"))
+	_parse_demo(demo_script(OS.get_environment("HUB_DEMO"), OS.get_cmdline_args() + OS.get_cmdline_user_args()))
 	Audio.music("card_row_loop")
 	_update_camera(0.0)
 	_report_cold_start()
@@ -167,15 +169,15 @@ func set_entries(list: Array[Dictionary], select_slug: String = "") -> void:
 			selected = i
 	var lead := lead_jarling()
 	var stand := HubLayout.stand_position(selected, count)
-	lead.hop_goal = Vector3.INF
 	lead.position = stand
 	lead.rotation.y = PI
 	var other := jarlings[1 - jarlings.find(lead)]
-	other.hop_goal = Vector3.INF
 	other.position = stand + Vector3(1.7 if stand.x <= 0.0 else -1.7, 0, 1.3)
 	other.rotation.y = PI
+	for j in jarlings:
+		j.jar_count = count
+		j.stop()
 	focus = [-1, -1]
-	_hop_index = [-1, -1]
 	_update_focus(true)
 
 
@@ -211,7 +213,6 @@ func _apply_roles() -> void:
 		j.set_held(held, Players.COLOR[Players.P1 if j == lead else Players.P2])
 		if not held:
 			j.move_input = Vector2.ZERO
-			j.hop_goal = Vector3.INF
 
 
 func _on_player_joined(player: int, _device: int) -> void:
@@ -248,27 +249,11 @@ func pick_profile(id: String) -> void:
 	_update_focus(true)
 
 
-## Sideways push: run straight to the next jar that way. At the end of the row the jar just wobbles.
-func hop(player: int, dir: int) -> void:
-	var j := jarling_for(player)
-	if j == null or j.busy or launch.active:
-		return
-	var ji := jarlings.find(j)
-	var from: int = _hop_index[ji] if j.hop_goal != Vector3.INF else focus[ji]
-	var target := HubLayout.hop_target(from, dir, j.position, spots.size())
-	Audio.play("ui_move")
-	if target == from:
-		spots[target].wobble()
-		return
-	_hop_index[ji] = target
-	j.hop_to(spots[target].stand_point)
-
-
 func _process(delta: float) -> void:
 	_clock += delta
 	_run_demo()
 	if screen == Screen.HUB and not launch.active and Time.get_ticks_msec() >= _input_from_ms:
-		_read_players(delta)
+		_read_players()
 		if _dev_combo.update(Input.is_action_pressed("launcher_lb"), Input.is_action_pressed("launcher_rb"), delta):
 			_toggle_dev()
 	if launch.active:
@@ -283,7 +268,9 @@ func _process(delta: float) -> void:
 		n.position.x += 0.35 * delta
 
 
-func _read_players(delta: float) -> void:
+## Every stick, D-pad or key direction walks the Jarling (full tilt runs). Nothing snaps to a jar:
+## you walk up to one and it comes into focus.
+func _read_players() -> void:
 	for player: int in [Players.P1, Players.P2]:
 		var j := jarling_for(player)
 		if j == null:
@@ -294,18 +281,11 @@ func _read_players(delta: float) -> void:
 		var v := Players.move_vector(player)
 		if player == Players.P1 and _clock < _demo_move_until:
 			v = _demo_move
+		if _demo_goal[player] >= 0:
+			v = _demo_steer(player, j)
 		if j.busy:
 			continue
-		if HubLayout.is_hop_push(v):
-			_hop_timer[player] -= delta
-			if not _hop_held[player] or (_hop_timer[player] <= 0.0 and j.hop_goal == Vector3.INF):
-				_hop_held[player] = true
-				_hop_timer[player] = HOP_REPEAT
-				hop(player, 1 if v.x > 0.0 else -1)
-			j.move_input = Vector2.ZERO
-		else:
-			_hop_held[player] = false
-			j.move_input = v
+		j.move_input = v
 		if Input.is_action_just_pressed(Players.action(player, "action")):
 			press_action(player)
 		if Input.is_action_just_pressed(Players.action(player, "jump")):
@@ -344,14 +324,12 @@ func _update_focus(silent: bool = false) -> void:
 	for i in jarlings.size():
 		var j := jarlings[i]
 		var f := -1
-		if j.follow == null and j.hop_goal == Vector3.INF:
+		if j.follow == null:
 			# mid-jump (into or out of a jar) a Jarling keeps the jar it was at
-			f = focus[i] if j.busy and focus[i] >= 0 else HubLayout.focus_at(j.position, spots.size())
+			f = focus[i] if j.busy and focus[i] >= 0 else HubLayout.focus_at(j.position, spots.size(), focus[i])
 		if f != focus[i]:
-			if f >= 0 and f != _hop_index[i] and not silent:
-				Audio.play("ui_move")   # walked up to a jar (a hop already made its sound)
-			if f >= 0:
-				_hop_index[i] = -1
+			if f >= 0 and not silent:
+				Audio.play("ui_move")   # walked up to a jar: a sound, the jar bounces and its pad lights
 			focus[i] = f
 		if f >= 0 and not colors.has(f):
 			colors[f] = j.color
@@ -651,8 +629,22 @@ func _build_sky_and_lights() -> void:
 
 # ---------------------------------------------------------------- scripted demo (screenshots only)
 
-## HUB_DEMO="wide;2:follow;3:right;5:walk:-0.6:0.7:1.5;7:p2;8:a" drives the hub without a pad so
+## The default scripted tour for `--demo` (when HUB_DEMO is not set): the Jarling runs from jar to
+## jar along the row and back, forever, and player 2 joins after a while. It never presses A.
+const DEMO_TOUR := "tour;9:p2"
+
+
+## HUB_DEMO wins; else `--demo` on the command line plays DEMO_TOUR; else nothing.
+static func demo_script(env: String, args: PackedStringArray) -> String:
+	if not env.is_empty():
+		return env
+	return DEMO_TOUR if args.has("--demo") else ""
+
+
+## HUB_DEMO="wide;2:follow;3:go:4;5:walk:-0.6:0.7:1.5;7:p2;8:a" drives the hub without a pad so
 ## shots.sh can frame it. Entries are `time:command[:args]`; a bare first word runs at time 0.
+## go:<jar> / go2:<jar> walk player 1 / 2 to that jar with a simulated stick (running, then easing
+## in); tour keeps player 1 walking along the row.
 func _parse_demo(text: String) -> void:
 	for part in text.split(";", false):
 		var bits := part.split(":")
@@ -662,15 +654,22 @@ func _parse_demo(text: String) -> void:
 
 
 func _run_demo() -> void:
+	if _demo_tour and _demo_goal[Players.P1] < 0 and spots.size() > 1 and not launch.active:
+		_demo_rest -= get_process_delta_time()
+		if _demo_rest <= 0.0:
+			var at := HubLayout.nearest(lead_jarling().position, spots.size())
+			if at + _demo_tour_dir < 0 or at + _demo_tour_dir >= spots.size():
+				_demo_tour_dir = -_demo_tour_dir
+			_demo_goal[Players.P1] = at + _demo_tour_dir
+			_demo_rest = DEMO_PAUSE
 	while not _demo.is_empty() and _clock >= float(_demo[0][0]):
 		var d: PackedStringArray = _demo.pop_front()
 		match d[1]:
 			"wide": _intro_hold = true
 			"follow": _intro_hold = false
-			"left": hop(Players.P1, -1)
-			"right": hop(Players.P1, 1)
-			"left2": hop(Players.P2, -1)
-			"right2": hop(Players.P2, 1)
+			"go": _demo_goal[Players.P1] = clampi(int(d[2]), 0, spots.size() - 1)
+			"go2": _demo_goal[Players.P2] = clampi(int(d[2]), 0, spots.size() - 1)
+			"tour": _demo_tour = true
 			"p2": join_second_player()
 			"lead":   # lead:p1 / lead:p2, without touching the save
 				profile = d[2]
@@ -685,3 +684,14 @@ func _run_demo() -> void:
 			"walk":
 				_demo_move = Vector2(float(d[2]), float(d[3]))
 				_demo_move_until = _clock + float(d[4])
+
+
+## A pretend stick for "go": full tilt towards the jar's stand point, easing off at the end, and let
+## go once there (the walk-up focus does the rest, as it would for a kid).
+func _demo_steer(player: int, j: HubJarling) -> Vector2:
+	var goal := spots[_demo_goal[player]].stand_point - j.position
+	var flat := Vector2(goal.x, goal.z)
+	if flat.length() < DEMO_STOP or j.busy:
+		_demo_goal[player] = -1
+		return Vector2.ZERO
+	return flat.normalized() * clampf(flat.length() / 1.5, 0.35, 1.0)
