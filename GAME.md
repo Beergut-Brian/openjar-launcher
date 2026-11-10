@@ -11,6 +11,9 @@ row of game cards. Pick one, it launches. When the game quits, you are back here
 ## Players
 - Either pad drives the launcher. No P1/P2 distinction here except the profile picker.
 - Profile picker: two faces, no names. Picks which `--profile=` the game gets.
+- You are your character: each held Jarling is that player's pick from the shared roster (the same
+  picks every Open Jar game uses, remembered per profile). Change it in place with Select. Rings stay
+  P1 green, P2 red, whoever you are.
 
 ## Controls
 Kaden, 2026-11-10: "On the launcher, I want to be able to run around." The hub is free roam; there
@@ -21,7 +24,8 @@ is no shortcut that runs you to a jar.
 | Left stick / D-pad / arrow keys | Walk anywhere on the island, any direction; all the way over runs |
 | (walk up to a jar) | It comes into focus: `ui_move`, the jar bounces, its lid lifts and your pad lights |
 | A | At a jar in focus: jump in and launch it. Anywhere else: a happy cheer |
-| B | Solo: be the other Jarling (the profile pick). Two players: a cheer |
+| B | Solo: switch save profile (you stay put and become that profile's pick). Two players: a cheer |
+| Select / Back (Tab or `/` on keys) | Change your character in place: poof, the next one pops out, its name over your head. Two players: the other's pick is skipped |
 | Hold LB + RB for 1 s | Toggle showing the `(dev)` builds (their jars wear a dark lid) |
 | Start | Quit to Steam |
 
@@ -104,6 +108,25 @@ installed (Smash Party via its kiosk shortcut counts), launches one, comes back.
   so running sideways along the row never gets stuck between two jars.
 - 2026-11-10 (free roam): with the hop gone, nothing wobbles at the ends of the row any more; the
   island edge just stops you. `--demo` (and `HUB_DEMO=tour`) walks a tour from jar to jar, never pressing A.
+
+- 2026-11-10 (chooser): the in-line character chooser is on **Select / Back** (View on an Xbox pad;
+  Tab for keyboard P1, `/` for keyboard P2). Kaden: "It can just be a part of the ready up screen";
+  the hub has no ready screen, so the chooser lives on your Jarling. A, B, Start and LB+RB are taken;
+  X and Y are face buttons right next to A that a 5-year-old mashes, while Select is the small
+  centre button that kids rarely press by accident. Each press is one step, presses during the
+  0.4 s swap are ignored, so even mashing it never strobes. Read per pad, so one pad's Select never
+  changes the other player.
+- 2026-11-10 (chooser): solo, the tag-along friend is nobody's pick in play, so cycling onto its
+  character trades with it (it becomes your old one). With two players the other's pick is skipped;
+  with only two characters in the roster that means nobody is free: a head shake and a low sound.
+- 2026-11-10 (chooser): a resident (Jeff, Chuck) who is the same character as either held Jarling
+  is hidden, so nobody is on screen twice. With today's roster of two that hides both residents.
+- 2026-11-10 (chooser): the hint ("Select  Change") fades in on the floor in front of your ring after
+  you stand still for 1.4 s and vanishes when you move; the name tag shows for 1.5 s after a swap.
+  Stand-in sound `intro_pop` until characters have recorded barks.
+- 2026-11-10 (chooser): B (profile swap) keeps you where you stand and re-pops your Jarling as that
+  profile's pick. Both profiles start as Jeff + Chuck, so until someone changes one, B looks like a
+  pop in place.
 
 ## Open questions
 - Logo and jar design: Kaden approves the Art lane's three options.

@@ -80,6 +80,74 @@ reported as leaked at exit. The window close button goes through `Audio.quit()` 
 F3 toggles the overlay (fps, state, player count). F12 saves `user://screenshots/<timestamp>.png`
 and prints the path. `--screenshot-after=<seconds>` CLI flag does it headlessly for the Reviewer.
 
+### `Roster` (`scripts/autoload/Roster.gd`)
+
+Who each player is: the playable characters (from `openjar-characters`, vendored by
+`scripts/tools/sync_characters.sh` into `assets/characters/<id>/` and `data/roster.json`) and each
+slot's pick. Player colours stay with the slot (`Players.COLOR`), never the character.
+
+```gdscript
+signal pick_changed(player: int, id: String)
+
+var data_path := "res://data/roster.json"   # tests point this at a fixture, then reload()
+var picks_path: String                       # the shared file; tests point this at user://
+var characters_tag: String                   # the openjar-characters tag the roster came from
+
+func roster() -> Array[String]               # playable ids in chooser order
+func has(id: String) -> bool
+func info(id: String) -> Dictionary          # {} if unknown, else:
+	# id, name ("Jeff"), glb ("res://assets/characters/jeff/jeff.glb" or ""),
+	# pixel ("res://assets/characters/jeff/pixel.png" or ""), voice ("res://.../voice/" or ""),
+	# barks (Array of file stems in voice/), default_for (1, 2 or 0)
+func default_for(player: int) -> String      # data/roster.json defaults.P1 / .P2
+func pick(player: int) -> String             # never "" while the roster has a character
+func set_pick(player: int, id: String) -> bool   # false (no change) if unknown or the other's pick
+func next_free(player: int, dir: int) -> String  # dir +1 / -1 through roster(), skipping the
+                                                 # other player's pick; pick(player) if none free
+func taken(id: String, by_other_than: int) -> bool
+func reload() -> void                        # re-read roster.json, args, the shared file
+func bark(id: String) -> bool                # plays a random voice bark; false if it has none
+```
+
+**Resolving a slot** at start (`reload()`), first hit that is in `roster()`:
+1. `--p1-char=<id>` / `--p2-char=<id>` (either side of `--`)
+2. the shared file `players.json[Save.profile]["P1" | "P2"]`
+3. `defaults.P1` / `defaults.P2`
+4. the first roster id the other player has not got
+
+Unknown, removed or resident ids are skipped, never an error. If both slots resolve to the same
+id, P2 moves to `next_free(P2, 1)`. No two players are ever the same character.
+
+**The shared picks file** (`picks_path`): `OS.get_data_dir() + "/openjar/players.json"` (Linux
+`~/.local/share/openjar/players.json`), outside every game's `user://`. Shared with every Open Jar
+game and the launcher:
+
+```json
+{ "p1": { "P1": "jeff", "P2": "chuck" }, "kid": { "P1": "chuck", "P2": "jeff" } }
+```
+
+Keyed by save profile, then slot. Written the moment a pick changes (`set_pick`): read the file,
+change only this profile's slot, keep every other key, write `players.json.tmp`, rename over
+`players.json` (folder created if missing). A missing or broken file reads as empty. Roster never
+touches the game's own `user://` saves.
+
+**Launch args**: the launcher passes `--profile=<id> --p1-char=<id> --p2-char=<id>`. They win over
+the file; a pick changed in the game is still written to the file.
+
+**Launcher additions** (same file otherwise; candidates to upstream to the template):
+
+```gdscript
+var profile_override := ""     # the picks entry to use instead of Save.profile ("" = Save.profile)
+func set_pick(player: int, id: String, bump: bool = false) -> bool
+	# bump: if the other slot has id, it gets your old character instead of refusing (one write)
+const TEST_PICKS := "user://test_players.json"   # picks_path in a gdUnit4 run
+```
+
+The launcher keeps its own `Save` profile (its save keys) but sets `profile_override` to the hub's
+`profile` (`p1`/`p2`), so the hub reads and writes the same `players.json` entry the game it
+launches will use. A gdUnit4 run never touches the real shared file, and a `--demo` / `HUB_DEMO`
+run uses `user://demo_players.json` (fresh each run).
+
 ## Launcher handshake
 
 The launcher starts a game with `--profile=<id>` and expects the game to:
@@ -162,14 +230,14 @@ it in the manifest. The launcher loads it at runtime from the install folder.
 
 The launcher starts an entry with `OS.create_process`:
 
-- `binary`: `<folder>/<binary> --profile=<id> <args...>`
-- `command`: `<program> <command[1:]...> --profile=<id> <args...>`
+- `binary`: `<folder>/<binary> --profile=<id> --p1-char=<c1> --p2-char=<c2> <args...>`
+- `command`: `<program> <command[1:]...> --profile=<id> --p1-char=<c1> --p2-char=<c2> <args...>`
 
-`<id>` is `p1` or `p2`: the save profile of the Jarling that jumped into the jar. The two profile
-Jarlings are generic kit Jarlings: `p1` is the grown-up, `p2` the kid-sized one. In solo play
-that is the Jarling the player picked; with two players it is whoever pressed A. A profile id is
-not a player slot: Jeff (P1, green) and Chuck (P2, red) stay player-locked and only live on the
-island as residents.
+`<id>` is `p1` or `p2`: the save profile of the Jarling that jumped into the jar. In solo play that
+is the profile player 1 picked (B); with two players it is the profile of whoever pressed A. A
+profile id is not a player slot. `<c1>` / `<c2>` are the two players' `Roster` picks as shown in the
+hub (P1's held Jarling, P2's or the tag-along); the game's `Roster` reads them before the shared
+file. A pick that is not a plain identifier is left out.
 The argument is passed **without** a `--` separator, so a Godot game must look for it in both
 `OS.get_cmdline_args()` and `OS.get_cmdline_user_args()` (`Save.gd` does). The working directory
 is inherited from the launcher; games must not rely on it.
@@ -189,8 +257,11 @@ again (either player) can never start a second game.
 ### Launcher hub (`scenes/hub/hub.tscn`, root script `scripts/hub/hub.gd`)
 
 The launcher is one 3D scene, the hub: each entry is a jar (`GameSpot`) on an arc, the two
-profile Jarlings (`HubJarling`, `jarlings[0]` grown-up = profile `p1`, `jarlings[1]` kid = profile
-`p2`) walk between them. Jeff and Chuck stand on the island as `residents` (never controlled). Layout maths is pure and lives in `HubLayout` (`scripts/hub/hub_layout.gd`).
+profile Jarlings (`HubJarling`, `jarlings[0]` = profile `p1`, `jarlings[1]` = profile `p2`) walk
+between them. Each is dressed as a `Roster` pick: the lead (player 1's, the hub `profile`) is
+`Roster.pick(P1)`, the other `Roster.pick(P2)` (`HubJarling.character_id`). Jeff and Chuck stand on
+the island as `residents` (never controlled); a resident who is the same character as a held
+Jarling is hidden. Layout maths is pure and lives in `HubLayout` (`scripts/hub/hub_layout.gd`).
 
 ```gdscript
 signal launched(slug: String, profile_id: String)
@@ -202,16 +273,22 @@ var two_players: bool
 var launch: LaunchSequence            # launch.active while the launch animation plays
 func set_entries(list: Array[Dictionary], select_slug: String = "") -> void
 func selected_entry() -> Dictionary   # entry of the lead Jarling's jar, {} when roaming
-func hop(player: int, dir: int) -> void          # stick left/right: run to the next jar
 func press_action(player: int) -> void           # A: start the launch sequence / wobble (empty jar) / cheer
-func pick_profile(id: String) -> void            # B in solo play: be the other Jarling
+func pick_profile(id: String) -> void            # B in solo play: the other profile and its picks
+func change_character(player: int) -> bool       # the in-line chooser: next Roster character
+func apply_characters(animate := false, always_lead := false) -> void   # dress Jarlings as the picks
+func current_chars() -> Dictionary               # {P1: id, P2: id} for --p1-char / --p2-char
 func join_second_player() -> void                # P2 takes the Jarling player 1 did not pick
 func quit_to_steam() -> void
 ```
 
-Input: a mostly-sideways stick push hops to the next jar (repeats while held, stops at the ends);
-any other stick direction walks freely. A at a jar launches it with the profile of the Jarling
-that jumps in. B in solo play swaps Jarling, which is the profile pick, saved at once. Start quits.
+Input: the stick walks freely (see GAME.md "Controls"). A at a jar launches it with the profile of
+the Jarling that jumps in. B in solo play swaps profile (saved at once): you stay where you are and
+become that profile's P1 pick. Select / Back on your own pad (keys: Tab for P1, `/` for P2) changes
+your character in place: next in roster order; with two players the other's pick is skipped
+(nobody free: a head shake); solo, landing on the tag-along's character trades with it. Ignored
+during the launch sequence and mid-swap. The pick is written to the shared file at once, and the
+hub re-reads that file when a game exits. Start quits.
 With two players, player 1 (green ring) keeps the picked Jarling and player 2 (red ring) holds the
 other one. Holding LB+RB for 1 s toggles dev entries. `GameSpot` API used by the hub:
 `setup(entry, index, world_kind)`, `place(position, stand_point)`, `set_highlighted(on, color)`,

@@ -35,9 +35,6 @@ One line per file. Nothing enters `assets/` without a line here.
 | `scenes/ui/theme.tres` | Pillow script `art/gen/build.py` | house UI theme: rounded panels, thick ink borders, palette colours; engine default font (no open chunky font offline) | Original work, Open Jar Games |
 | `store/grid.png` | Pillow script `art/gen/build.py` | 600x900 launcher store card: logo A, Jeff/Chuck stand-ins, burst, hills | Original work, Open Jar Games |
 | `store/hero.png` | Pillow script `art/gen/build.py` | 920x430 launcher banner: logo A, Jeff/Chuck stand-ins, burst, hills | Original work, Open Jar Games |
-| `assets/models/jarlings/jeff.glb` | `openjar-characters` avatar kit (`avatar/kit/build_jarling.py`, Blender) | Jeff as a Jarling (P1, green); copied unchanged from `characters/jeff/refs/jarling/jeff.glb` | Original work, Open Jar Games |
-| `assets/models/jarlings/chuck.glb` | `openjar-characters` avatar kit (`avatar/kit/build_jarling.py`, Blender) | Chuck as a Jarling (P2, red); copied unchanged from `characters/chuck/refs/jarling/chuck.glb` | Original work, Open Jar Games |
-| `assets/models/jarlings/jeff_jeff_face.png`, `chuck_chuck_face.png`, `chuck_chuck_tiedye.png`, `chuck_chuck_trex.png` | written by Godot's glTF importer from the two `.glb` files above | embedded textures (face atlases, Chuck's shirt and cap prints), unchanged | Original work, Open Jar Games |
 | `assets/shaders/hub/sky.gdshader` | hand-written Godot shader | magic-hour sky gradient, sun disc, stars; static (no TIME) | Original work, Open Jar Games |
 | `assets/shaders/hub/jar_glass.gdshader` | hand-written Godot shader | game-jar glass: fresnel rim, streak highlights, accent tint | Original work, Open Jar Games |
 | `assets/shaders/hub/beam.gdshader` | hand-written Godot shader | additive light beam above the jar a Jarling stands at | Original work, Open Jar Games |
@@ -55,3 +52,16 @@ One line per file. Nothing enters `assets/` without a line here.
 | `assets/models/jarlings/grownup_grownup_face.png`, `kid_kid_face.png` | written by Godot's glTF importer from the two `.glb` files above | embedded face atlases, unchanged | Original work, Open Jar Games |
 | `scripts/hub/jar_world.gd` (generated jar dioramas) | hand-written GDScript, Godot primitive meshes | the "tiny world in every jar" idea and the eight diorama recipes (meadow, space, ocean, volcano, forest, castle, snow, candy) are ported from the other hub entry, branch `feature/hub-opus` (`scripts/hub/game_jar.gd`, `hub_mesh.gd`, `hub_look.gd`), restyled to this island's palette and lighting | Original work, Open Jar Games |
 | `tests/fixtures/hub_8/moon-golf/store/jar.tscn` | hand-written Godot scene, primitive meshes only | test-only example of a game-supplied jar world: moon, craters, flag, ball, orbiting ringed planet | Original work, Open Jar Games |
+
+<!-- characters:begin (scripts/tools/sync_characters.sh writes this block) -->
+
+## Characters (synced from openjar-characters v0.3.0)
+
+| File | Source / tool | Prompt or notes | License |
+| --- | --- | --- | --- |
+| `characters/jeff/jeff.glb` | `openjar-characters` `v0.3.0`, `characters/jeff/refs/jarling/jeff.glb` (Jarlings avatar kit, Blender, procedural); Godot extracts its textures (`jeff_*.png`) on import | Jeff, playable; copied unchanged | Open Jar Games, in-house (same terms as openjar-characters) |
+| `characters/jeff/pixel.png` | `openjar-characters` `v0.3.0`, `tools/pixel/residents.py` `jeff()` (Python + Pillow, drawn in code) | Jeff pixel form (the-hill pixel), front view, native size | Open Jar Games, in-house (same terms as openjar-characters) |
+| `characters/chuck/chuck.glb` | `openjar-characters` `v0.3.0`, `characters/chuck/refs/jarling/chuck.glb` (Jarlings avatar kit, Blender, procedural); Godot extracts its textures (`chuck_*.png`) on import | Chuck, playable; copied unchanged | Open Jar Games, in-house (same terms as openjar-characters) |
+| `characters/chuck/pixel.png` | `openjar-characters` `v0.3.0`, `tools/pixel/residents.py` `chuck()` (Python + Pillow, drawn in code) | Chuck pixel form (the-hill pixel), front view, native size | Open Jar Games, in-house (same terms as openjar-characters) |
+
+<!-- characters:end -->
