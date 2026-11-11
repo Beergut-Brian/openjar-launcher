@@ -47,7 +47,8 @@ var _vel := Vector3.ZERO
 var _shape_tween: Tween
 var _tag: Label3D
 var _tag_tween: Tween
-var _hint: Label3D
+var _hint: Sprite3D                 # the chooser hint: a button picture (HintGlyph), never words
+var hint_kind := HintGlyph.Kind.SELECT
 var _still := 0.0
 
 
@@ -75,7 +76,15 @@ func setup(model_scene: PackedScene, id: String, ring_color: Color, model_size: 
 	add_child(_ring)
 	_tag = _label(64, 16)
 	_tag.visible = false
-	_hint = _label(34, 10)
+	_hint = Sprite3D.new()
+	_hint.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_hint.no_depth_test = true
+	_hint.shaded = false
+	_hint.double_sided = true
+	_hint.pixel_size = 0.0045
+	_hint.render_priority = 2
+	_hint.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	add_child(_hint)
 	_hint.top_level = true          # stays on the floor in front of the ring whichever way it faces
 	_hint.modulate.a = 0.0
 	_hint.visible = false
@@ -385,13 +394,13 @@ func _update_hint(delta: float) -> void:
 	_hint.modulate.a = move_toward(_hint.modulate.a, want, delta * (3.0 if want > 0.0 else 12.0))
 	_hint.visible = _hint.modulate.a > 0.01
 	if _hint.visible:
-		_hint.global_position = global_position + Vector3(0, 0.08, 0.9)
+		_hint.global_position = global_position + Vector3(0, 0.25, 0.9)
 
 
-## What the hint says: "<button> Change". The hub sets it (keyboard players see their key).
-func set_hint_text(text: String) -> void:
-	_hint.text = text
-	_hint.outline_modulate = INK.lerp(color, 0.45)
+## Which button the hint shows: the pad's Select, or the keyboard player's key. The hub sets it.
+func set_hint_glyph(kind: HintGlyph.Kind, player_color: Color = color) -> void:
+	hint_kind = kind
+	_hint.texture = HintGlyph.texture(kind, player_color)
 
 
 ## Full analogue control: a small tilt tiptoes, most of the way walks, all the way over runs.

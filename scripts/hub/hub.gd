@@ -548,14 +548,15 @@ func _update_residents() -> void:
 		r.visible = jarlings.all(func(j: HubJarling) -> bool: return j.character_id != r.character_id)
 
 
-## "<button> Change" by each held ring: Select on a pad, the player's key with no pad at all.
+## The chooser hint by each held ring, a picture (K-01): the pad's Select button and swap arrows in
+## the player's colour; with no pad at all, the player's key (Tab for P1, slash for P2).
 func _update_hints() -> void:
 	var pads := not Input.get_connected_joypads().is_empty()
 	for p: int in [Players.P1, Players.P2]:
 		var j := jarling_for(p)
 		if j != null:
-			var key := "Tab" if p == Players.P1 else "/"
-			j.set_hint_text("%s  Change" % ("Select" if Players.device_of(p) >= 0 or pads else key))
+			var key := HintGlyph.Kind.TAB if p == Players.P1 else HintGlyph.Kind.SLASH
+			j.set_hint_glyph(HintGlyph.Kind.SELECT if Players.device_of(p) >= 0 or pads else key, Players.COLOR[p])
 
 
 ## Before any pad joins, P1 and P2 pad events both match every device; only the keyboard can tell
