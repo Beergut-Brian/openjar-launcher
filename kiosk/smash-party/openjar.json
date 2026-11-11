@@ -1,0 +1,8 @@
+{
+  "slug": "smash-party",
+  "name": "Smash Party",
+  "version": "browser",
+  "command": ["smash-party.sh"],
+  "jar": "store/jar.tscn",
+  "dev": false
+}

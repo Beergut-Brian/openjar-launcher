@@ -43,6 +43,11 @@ const CHANGE_SOUND := "intro_pop"  # the chooser's swap sound, at once on every 
 const SAY_SETTLE := 0.3
 ## K-02: Start must be held this long to leave the launcher; a tap only ticks and shows the badge.
 const QUIT_HOLD := 1.5
+## C-14: a `command` game (Smash Party in a kiosk browser) has no quit of its own a kid can reach,
+## so while one runs, holding Start this long closes it and you come home. Longer than QUIT_HOLD,
+## so a pause press in the game never does it. Godot games quit themselves and are never stopped.
+const HOME_HOLD := 2.0
+const STOP_GRACE := 3.0           # after asking a game to stop (TERM): kill it if it is still there
 ## A-05: the launching character's own voice on top of the beat sounds: a happy bark as it leaps
 ## into the jar, another as it pops back out. First one the character has; none: just the beat sound.
 const LEAP_BARKS := ["ready", "cheer", "join"]
@@ -83,6 +88,10 @@ var _input_from_ms := 0
 var _dev_combo := HoldCombo.new(1.0)
 var _quit_combo := HoldCombo.new(QUIT_HOLD)
 var _quit_down := false
+var _quit_needs_release := false         # Start still held from the game: let go before it counts
+var _home_combo := HoldCombo.new(HOME_HOLD)
+var _running_command := false            # the running game is a `command` entry (home hold works)
+var _stopping := false
 var _quitting := false
 var _demo_quit_until := 0.0
 var quit_meter: QuitMeter
@@ -250,6 +259,9 @@ func cold_start_marks() -> String:
 func update_quit(down: bool, delta: float) -> bool:
 	if screen == Screen.RUNNING or _quitting:
 		down = false
+	if _quit_needs_release:
+		_quit_needs_release = down
+		down = false
 	if down and not _quit_down:
 		Audio.play("ui_move")   # every press sounds, even one that does nothing yet
 	_quit_down = down
@@ -258,6 +270,32 @@ func update_quit(down: bool, delta: float) -> bool:
 	if go:
 		quit_to_steam()
 	return go
+
+
+## While a `command` game runs, Start held for HOME_HOLD s closes it (stop_game). True on that frame.
+func update_home(down: bool, delta: float) -> bool:
+	if screen != Screen.RUNNING or not _running_command or _stopping:
+		down = false
+	if _home_combo.update(down, down, delta):
+		stop_game()
+		return true
+	return false
+
+
+## Ask the running game to close (TERM, so its launch script can take its browser down with it),
+## then kill it if it is still there after STOP_GRACE s. The process watch brings the hub back.
+func stop_game() -> void:
+	if _pid <= 0 or _stopping:
+		return
+	_stopping = true
+	Audio.play("ui_back")
+	print("launcher: home hold, stopping %s (pid %d)" % [_running_slug, _pid])
+	var pid := _pid
+	OS.execute("kill", ["-TERM", str(pid)])
+	await get_tree().create_timer(STOP_GRACE).timeout
+	if pid == _pid and OS.is_process_running(pid):
+		push_warning("launcher: %s ignored TERM, killing it" % _running_slug)
+		OS.kill(pid)
 
 
 func quit_to_steam() -> void:
@@ -404,6 +442,7 @@ func _process(delta: float) -> void:
 	_clock += delta
 	_run_demo()
 	update_quit(Input.is_action_pressed("launcher_quit") or _clock < _demo_quit_until, delta)
+	update_home(Input.is_action_pressed("launcher_quit"), delta)
 	voice_step(delta)
 	if intro_playing():
 		for p: int in [Players.P1, Players.P2]:
@@ -687,6 +726,8 @@ func _launch(spot: GameSpot, j: HubJarling) -> void:
 		other.move_input = Vector2.ZERO
 	if not entry.binary.is_empty():
 		_ensure_executable(entry.binary)
+	elif _launch_cmd.path.begins_with(String(entry.dir).path_join("")):
+		_ensure_executable(_launch_cmd.path)   # a launch script in the game's folder (zips lose the bit)
 
 
 ## One sound per beat, and the things that happen once. Everything else is posed from launch.t.
@@ -749,6 +790,7 @@ func _start_game() -> void:
 		return
 	_pid = pid
 	_running_slug = entry.slug
+	_running_command = not entry.command.is_empty()
 	launched.emit(entry.slug, j.profile_id)
 	_set_screen(Screen.RUNNING)
 
@@ -758,6 +800,8 @@ func _on_process_watch() -> void:
 		return
 	print("launcher: %s exited (code %d)" % [_running_slug, OS.get_process_exit_code(_pid)])
 	_pid = -1
+	_stopping = false
+	_quit_needs_release = true   # Start may still be down (the home hold, a game's own quit)
 	Roster.reload()           # a pick changed inside the game shows up here
 	apply_characters()
 	_rescan(_running_slug)   # pick up games installed or updated meanwhile
