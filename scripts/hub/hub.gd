@@ -34,7 +34,9 @@ const RESIDENTS := [["jeff", Vector3(-5.6, 0, 1.4)], ["chuck", Vector3(5.6, 0, 1
 ## The in-line chooser: Back / View / Select on the pad (JOY_BUTTON_BACK), Tab (P1) or / (P2) on the
 ## keyboard. A button nothing else in the hub uses and a small one a kid does not mash. GAME.md.
 const CHANGE_BUTTON := JOY_BUTTON_BACK
-const CHANGE_SOUND := "intro_pop"  # the chooser's swap sound, at once on every step
+## P2 drops out: their Jarling hops and goes back to tagging along.
+const LEAVE_SOUND := "player_leave"
+const CHANGE_SOUND := "chooser_swap"  # the chooser's swap sound (a puff and a "ta!"), at once on every step
 ## Chooser voice (Kaden 2026-11-10; docs/roster.md "Chooser voice"): quiet this long after the last
 ## step (or P2's join, or a profile swap) has landed, then the character now shown says its
 ## catchphrase once. Launcher: the settle counts only once the Jarling's swap animation is done,
@@ -96,6 +98,7 @@ var _stopping := false
 var _quitting := false
 var _demo_quit_until := 0.0
 var quit_meter: QuitMeter
+var version_label: Label
 var really_quit := true                  # tests turn this off to see the hold without quitting
 var _intro := 0.0
 var _intro_hold := false
@@ -164,6 +167,18 @@ func _ready() -> void:
 	layer.add_child(_flash)
 	quit_meter = QuitMeter.new()
 	layer.add_child(quit_meter)
+	version_label = Label.new()   # for grown-ups: which build is on the TV (the release tag)
+	version_label.name = "Version"
+	version_label.text = version_text()
+	version_label.add_theme_font_size_override("font_size", 18)
+	version_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.45))
+	version_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.35))
+	version_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 14)
+	version_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	version_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	version_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(version_label)
+	print("launcher: version %s" % version_label.text)
 	root_dir = ManifestScanner.default_root()
 	two_players = Players.is_active(Players.P2)
 	Players.player_joined.connect(_on_player_joined)
@@ -235,6 +250,12 @@ func _report_cold_start() -> void:
 	_mark("first frame")
 	print("launcher: interactive (hub, %d jars) after %d ms, unix %.3f (%s)" % [
 		spots.size(), Time.get_ticks_msec(), Time.get_unix_time_from_system(), cold_start_marks()])
+
+
+## "v0.1.0" / "v0.1.0-dev.3": release.yml stamps the tag into config/version before it exports.
+static func version_text(version: String = str(ProjectSettings.get_setting("application/config/version", ""))) -> String:
+	version = version.strip_edges().trim_prefix("v")
+	return "v" + version if not version.is_empty() else "v?"
 
 
 static func fallback_model(profile_id: String) -> PackedScene:
@@ -392,11 +413,17 @@ func _on_player_joined(player: int, _device: int) -> void:
 		join_second_player()
 
 
+## P2's pad goes away (unplugged, out of battery): their Jarling goes back to tagging along, with a
+## little "bye" (a sound and a hop), so dropping out is never silent.
 func _on_player_left(player: int) -> void:
-	if player == Players.P2:
+	if player == Players.P2 and two_players:
 		cancel_say(Players.P2)
 		two_players = false
+		var j := jarlings[1 - index_of_profile(profile)]
 		_apply_roles()
+		Audio.play(LEAVE_SOUND)
+		if not j.busy:
+			j.cheer(0.5)
 
 
 ## P2 drops in (second pad, or the P2 keys): takes the tag-along Jarling, wherever it is.
@@ -705,7 +732,7 @@ func _toggle_dev() -> void:
 
 ## A at a jar: remember the pick and start the launch animation. The game itself starts on its GO beat.
 func _launch(spot: GameSpot, j: HubJarling) -> void:
-	if not launch.start():
+	if _quitting or not launch.start():
 		return
 	cancel_say(Players.P1)
 	cancel_say(Players.P2)
@@ -778,6 +805,9 @@ func _pose_launch() -> void:
 
 ## The GO beat: the animation is over, hand the TV to the game.
 func _start_game() -> void:
+	if _quitting:   # Start was held to the end during the launch: leave, never start a game behind us
+		launch.cancel()
+		return
 	var entry := _launch_spot.entry
 	var j := jarlings[_launcher_index]
 	_dived = true
@@ -1077,6 +1107,8 @@ func _run_demo() -> void:
 			"go2": _demo_goal[Players.P2] = clampi(int(d[2]), 0, spots.size() - 1)
 			"tour": _demo_tour = true
 			"p2": join_second_player()
+			"p2off": _on_player_left(Players.P2)   # as if P2's pad went away
+			"dev": _toggle_dev()                   # as if LB + RB were held 1 s
 			"lead":   # lead:p1 / lead:p2, without touching the save
 				profile = d[2]
 				_apply_roles()

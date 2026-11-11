@@ -14,7 +14,8 @@ const LID_REST := PLINTH_HEIGHT + JAR_HEIGHT + 0.06
 const LID_LIFT := 0.75
 const WORLD_SCALE := 1.05    # generated and fitted worlds are authored for a slightly smaller jar
 const LID_HAT_SCALE := 0.62   # the flown-off lid shrinks a little so it sits on a Jarling like a hat
-const DEV_LID := Color("3a3f5c")
+## A dev build's lid: charcoal, nearly matte, so the magic-hour sky doesn't turn it blue-grey (C-07).
+const DEV_LID := Color("1c1d24")
 ## Bright jar colours for games without art, picked by slug so a game keeps its colour.
 const TOY_COLORS := [Color("ffd23f"), Color("35b6ff"), Color("ff7ac8"), Color("5ef0c0"), Color("ff8a3d"), Color("a78bff")]
 
@@ -297,8 +298,8 @@ func _build(world: Node3D, art: Texture2D) -> void:
 	_lid.position.y = LID_REST
 	var lid_color := DEV_LID if dev else accent.darkened(0.12)
 	var lid_mat := _flat(lid_color)
-	lid_mat.metallic = 0.5
-	lid_mat.roughness = 0.35
+	lid_mat.metallic = 0.15 if dev else 0.5
+	lid_mat.roughness = 0.7 if dev else 0.35
 	_mesh(_lid, _cyl(0.86, 0.86, 0.3), lid_mat, Vector3(0, 0.15, 0))
 	_mesh(_lid, _cyl(0.6, 0.78, 0.1), lid_mat, Vector3(0, 0.34, 0))
 	var knob := SphereMesh.new()   # so a spinning lid reads as spinning

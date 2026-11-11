@@ -294,6 +294,27 @@ def player_join(rng):
     return fades(svf(x, 4500.0), fade_out=0.02)
 
 
+def player_leave(rng):
+    """P2's pad goes away: player_join played backwards in spirit, two falling blips, "bye-bye"."""
+    x = silence(0.26)
+    toy = ((1, 1.0, 0.0), (2, 0.12, 0.0), (3, 0.15, 0.0))
+    mix(x, chirp(midi(84), midi(77), 0.08, toy))            # C6 -> F5
+    mix(x, chirp(midi(77), midi(69), 0.12, toy), 0.12)      # F5 -> A4: "bye-bye"
+    return fades(svf(x, 4000.0), fade_out=0.03)
+
+
+def chooser_swap(rng):
+    """Select in the hub: a soft puff of smoke and a quick bright "ta!" as the next friend pops out."""
+    x = silence(0.4)
+    puff = envelope(svf(noise(0.18, rng), 900.0, 0.9, "band"),
+                    lambda t: (1.0 - math.exp(-t / 0.01)) * math.exp(-t / 0.05))
+    mix(x, puff, 0.0, 1.1)
+    toy = ((1, 1.0, 0.0), (2, 0.25, 0.0), (3, 0.08, 0.0))
+    mix(x, chirp(midi(76), midi(88), 0.06, toy), 0.07, 0.55)   # E5 -> E6 pop
+    mix(x, struck(midi(91), 0.07, rng, BELL, click=0.0), 0.12, 0.35)   # G6 ding
+    return fades(svf(x, 6000.0), fade_out=0.05)
+
+
 def intro_pop(rng):
     x = silence(1.2)
     # Snap of the lid coming off.
@@ -524,6 +545,8 @@ FILES = {
     "intro_thump": (intro_thump, "sfx", 0.0),
     "launch": (launch, "sfx", 0.0),
     "player_join": (player_join, "sfx", 0.0),
+    "player_leave": (player_leave, "sfx", 0.0),
+    "chooser_swap": (chooser_swap, "sfx", -1.0),
     "round_start": (round_start, "sfx", 0.0),
     "round_end": (round_end, "sfx", 0.0),
     "pause": (pause, "sfx", -2.0),
