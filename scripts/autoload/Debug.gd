@@ -19,6 +19,7 @@ var _soak_every := 10.0
 var _soak_seconds := -1.0
 var _soak_next := 0.0
 var _soak_frames := 0
+var _soak_last_usec := 0
 var _soak_ms_sum := 0.0
 var _soak_ms_max := 0.0
 var _soak_voices_max := 0
@@ -116,9 +117,13 @@ func soak_row(t: float) -> Dictionary:
 func _soak_step(delta: float) -> void:
 	if _soak_done:
 		return
+	# wall-clock frame time: the engine clamps delta (8 physics steps, 133 ms), which hides a slow frame
+	var now := Time.get_ticks_usec()
+	var ms := (now - _soak_last_usec) / 1000.0 if _soak_last_usec > 0 else delta * 1000.0
+	_soak_last_usec = now
 	_soak_frames += 1
-	_soak_ms_sum += delta * 1000.0
-	_soak_ms_max = maxf(_soak_ms_max, delta * 1000.0)
+	_soak_ms_sum += ms
+	_soak_ms_max = maxf(_soak_ms_max, ms)
 	if _soak_frames % 15 == 0:
 		_soak_voices_max = maxi(_soak_voices_max, voices_playing())
 	if _clock_soak() < _soak_next:

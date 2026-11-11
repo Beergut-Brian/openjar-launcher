@@ -267,3 +267,26 @@ func test_the_corner_shows_the_release_version() -> void:
 	assert_str(hub.version_label.text).is_equal(
 			"v" + str(ProjectSettings.get_setting("application/config/version")).trim_prefix("v"))
 	assert_float(hub.version_label.get_theme_color("font_color").a).is_less(0.6)   # quiet, not for kids
+
+
+func _playing_anywhere(at: Node) -> int:
+	var n := 1 if (at is AudioStreamPlayer or at is AudioStreamPlayer3D) and at.playing else 0
+	for c in at.get_children():
+		n += _playing_anywhere(c)
+	return n
+
+
+## Quitting mid-intro used to leave the intro's crowd voices playing (outside the Audio pool), which
+## leaked their streams at exit. release_all() (Audio.quit's first step) now silences every player.
+func test_release_all_silences_the_intro_crowd_too() -> void:
+	Roster.data_path = "res://data/roster.json"   # real voices, so the crowd has something to say
+	Roster.reload()
+	var hub := await _hub()
+	hub.play_intro()
+	var t := 0.0
+	while _playing_anywhere(get_tree().root) == 0 and t < 6.0:
+		await _wait(0.1)
+		t += 0.1
+	assert_int(_playing_anywhere(get_tree().root)).is_greater(0)
+	Audio.release_all()
+	assert_int(_playing_anywhere(get_tree().root)).is_equal(0)
