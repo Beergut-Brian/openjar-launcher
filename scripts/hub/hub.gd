@@ -30,7 +30,13 @@ const RESIDENTS := [["jeff", Vector3(-5.6, 0, 1.4)], ["chuck", Vector3(5.6, 0, 1
 ## The in-line chooser: Back / View / Select on the pad (JOY_BUTTON_BACK), Tab (P1) or / (P2) on the
 ## keyboard. A button nothing else in the hub uses and a small one a kid does not mash. GAME.md.
 const CHANGE_BUTTON := JOY_BUTTON_BACK
-const CHANGE_SOUND := "intro_pop"  # stand-in until a character has recorded barks
+const CHANGE_SOUND := "intro_pop"  # the chooser's swap sound, at once on every step
+## Chooser voice (Kaden 2026-11-10; docs/roster.md "Chooser voice"): quiet this long after the last
+## step (or P2's join, or a profile swap) has landed, then the character now shown says its
+## catchphrase once. Launcher: the settle counts only once the Jarling's swap animation is done,
+## since presses are ignored mid-swap (0.39 s, longer than the settle). Fast scrolling says only the
+## one you stop on; standing still says nothing more.
+const SAY_SETTLE := 0.3
 const SUN_DIR := Vector3(0.42, 0.2, -1.0)   # the sun you see: low behind the jars, a little to the right
 ## The light itself comes from higher up on the same bearing, so shadows stay short and crisp.
 const LIGHT_DIR := Vector3(0.42, 0.46, -1.0)
@@ -76,6 +82,8 @@ var _demo_goal: Array[int] = [-1, -1]   # by player: the jar a "go" command is w
 var _demo_tour := false
 var _demo_tour_dir := 1
 var _demo_rest := 0.0
+## Chooser voice: seconds until this player's catchphrase; < 0 nothing pending.
+var _say_in := { Players.P1: -1.0, Players.P2: -1.0 }
 
 @onready var camera: Camera3D = $Camera
 @onready var world: Node3D = $World
@@ -103,11 +111,11 @@ func _ready() -> void:
 		j.character_id = pick if scene else ""
 		jarlings.append(j)
 	for r: Array in RESIDENTS:
-		var j := HubJarling.new()
-		add_child(j)
 		var scene := character_scene(r[0])
 		if scene == null:
-			continue
+			continue   # a roster without this resident (a fixture): no half-built Jarling left behind
+		var j := HubJarling.new()
+		add_child(j)
 		j.setup(scene, "", Color.WHITE, CHARACTER_SIZE)
 		j.character_id = r[0]
 		j.set_held(false)
@@ -243,6 +251,7 @@ func _on_player_joined(player: int, _device: int) -> void:
 
 func _on_player_left(player: int) -> void:
 	if player == Players.P2:
+		cancel_say(Players.P2)
 		two_players = false
 		_apply_roles()
 
@@ -255,6 +264,7 @@ func join_second_player() -> void:
 	_change_down[Players.P2] = true   # the press that joined never also changes the character
 	_apply_roles()
 	jarling_for(Players.P2).cheer()
+	say_soon(Players.P2)   # the pick shown on joining says its catchphrase
 	for r in residents:
 		if r.visible:
 			r.cheer()
@@ -283,11 +293,13 @@ func pick_profile(id: String) -> void:
 	_apply_roles()
 	apply_characters(true, true)
 	_update_focus(true)
+	say_soon(Players.P1)   # you are someone new: they say who they are
 
 
 func _process(delta: float) -> void:
 	_clock += delta
 	_run_demo()
+	voice_step(delta)
 	if screen == Screen.HUB and not launch.active and Time.get_ticks_msec() >= _input_from_ms:
 		_read_players()
 		if _dev_combo.update(Input.is_action_pressed("launcher_lb"), Input.is_action_pressed("launcher_rb"), delta):
@@ -367,9 +379,46 @@ func change_character(player: int) -> bool:
 		j.shake()
 		return false
 	apply_characters(true)
-	if not Roster.bark(to):
-		Audio.play(CHANGE_SOUND)
+	Audio.play(CHANGE_SOUND)
+	say_soon(player)
 	return true
+
+
+## Chooser voice: (re)start this player's settle; the catchphrase comes SAY_SETTLE s after the
+## last call.
+func say_soon(player: int) -> void:
+	_say_in[player] = SAY_SETTLE
+
+
+func cancel_say(player: int) -> void:
+	_say_in[player] = -1.0
+
+
+## Is a catchphrase waiting for its settle?
+func say_pending(player: int) -> bool:
+	return _say_in[player] >= 0.0
+
+
+## Count the settles down; a finished one says the shown character once, on the player's own voice
+## (it cuts off only that player's previous line). No catchphrase or bark: nothing more (the step
+## already made its swap sound). Nothing during a launch.
+func voice_step(delta: float) -> void:
+	for p in [Players.P1, Players.P2]:
+		if _say_in[p] < 0.0:
+			continue
+		var j := jarling_for(p)
+		if j != null and j.swapping:
+			continue   # the settle starts once the new character has popped in (swap_to: 0.39 s)
+		_say_in[p] -= delta
+		if _say_in[p] > 0.0:
+			continue
+		_say_in[p] = -1.0
+		var id := Roster.pick(p)
+		if (p == Players.P2 and not two_players) or launch.active or id == "":
+			continue
+		var ok := Roster.catchphrase(id, p)
+		print("Chooser voice: P%d %s %s (t=%.2f s)" % [p + 1, id,
+				Roster.last_said.get(p, "") if ok else "(no voice)", Time.get_ticks_msec() / 1000.0])
 
 
 ## A Roster character's model, or null if it has none (the hub then keeps the fallback body).
@@ -481,6 +530,8 @@ func _toggle_dev() -> void:
 func _launch(spot: GameSpot, j: HubJarling) -> void:
 	if not launch.start():
 		return
+	cancel_say(Players.P1)
+	cancel_say(Players.P2)
 	var entry := spot.entry
 	_launch_cmd = LaunchArgs.build(entry, j.profile_id, current_chars())
 	LauncherState.set_last_card(Save, entry.slug)
