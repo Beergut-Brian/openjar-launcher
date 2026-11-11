@@ -1,0 +1,20 @@
+# S-02 on the producer box, gap-close-3 (2026-11-11, dev at ae25b42 + this branch): the hub under openbox 3.6.1
+# (EWMH window manager) on a private Xvfb, X11, launching a fake 4 s game (HUB_DEMO=follow;1:go:0;6:a).
+# Harness: scripts/tools/s02_check.sh. Times are slow because the box renders on the CPU (load avg ~15).
+## launcher log
+launcher: version v0.0.0-local
+launcher: 1 entries in <worktree>/.scratch/wmroot
+launcher: interactive (hub, 1 jars) after 12525 ms, unix 1794386000.511 (ready 3173 (+3173), characters 4320 (+1147), jars 4507 (+187), first frame 12525 (+8018))
+launcher: starting <worktree>/.scratch/wmroot/slow-game/game.sh --profile=p1 --p1-char=jeff --p2-char=chuck
+launcher: window: minimise while the game runs, done (mode 1) after 318 ms
+launcher: slow-game exited (code 0)
+launcher: 1 entries in <worktree>/.scratch/wmroot
+launcher: window: restore after the game, done (mode 3) after 9 ms
+## window manager
+openbox alive: yes
+_NET_SUPPORTING_WM_CHECK(WINDOW): window id # 0x20000e
+_NET_WM_NAME:  not found.
+## hub window state, sampled every 0.5 s by xprop (count, first time, state)
+43 t=2.5  _NET_WM_STATE(ATOM) = _NET_WM_STATE_FULLSCREEN WM_STATE(WM_STATE): window state: Normal icon window: 0x0 active=hub
+7 t=24  _NET_WM_STATE(ATOM) = _NET_WM_STATE_HIDDEN, _NET_WM_STATE_FULLSCREEN WM_STATE(WM_STATE): window state: Iconic icon window: 0x0 active=other
+6 t=27.5  _NET_WM_STATE(ATOM) = _NET_WM_STATE_FULLSCREEN WM_STATE(WM_STATE): window state: Normal icon window: 0x0 active=hub
