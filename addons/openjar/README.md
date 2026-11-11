@@ -37,7 +37,7 @@ Only things that are identical across games and that the template would otherwis
 | `split_screen/` | `ScreenDirector`: dynamic two-player split across several 2D scenes | 0.2.0 |
 | `cutscene/` | `CutscenePlayer`: data-driven cutscenes behind a host interface (`docs/cutscene-format.md`) | 0.2.0 |
 | `picto_bubble/` | `PictoBubble`: wordless picture speech bubbles, game pictures by registration | 0.2.0 |
-| `theme/` | The big-button UI theme (`openjar_theme.tres`), fonts, P1/P2 colour constants | TODO: first real asset from the launcher |
+| `theme/` | The big-button UI theme (`openjar_theme.tres`), fonts, P1/P2 colour constants | Unreleased: `openjar_theme.tres` from the launcher (`theme/README.md`); fonts and P1/P2 colours TODO |
 | `ui/` | Pause menu, restart prompt, profile picker scenes used as-is by every game | TODO |
 | `launcher/` | `openjar_manifest.gd`: writes `store/openjar.json` at export; `launcher_bridge.gd`: reads `--profile=` and exits cleanly | TODO |
 | `characters/` | Submodule → `openjar-characters` | wire up after first tag |

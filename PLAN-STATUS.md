@@ -17,10 +17,13 @@ the plan-status lane against the code, the test run and real frames, not against
   Kaden list in `docs/launch-checklist.md`.
 - **Totals** (gap-close-3 recount, 2026-11-11): 79 rows: 63 built, 11 superseded, 4 partial, 1 missing. Every row
   left open needs the TV box (K-06 missing, K-07 partial: weekend TV check), Kaden's pick (V-01, V-02) or
-  another repo (V-04: the addon is vendored, but its v0.2.0 tag has no theme yet).
+  another repo (V-04: the addon is vendored, but its v0.2.0 tag has no theme yet; closed by vendor-theme-1 below).
 - **Vendor-addons-1** (`feature/launcher-vendor-addons-1`, 2026-11-11): `openjar-addons` v0.2.0 vendored at
   `addons/openjar/`; V-04 stays partial (reason in the row). Recount: totals unchanged, 79 rows: 63 built, 11 superseded,
   4 partial, 1 missing. `scripts/tools/test.sh` exits 0: 169 test cases, 0 failures (`handoff/test-output.txt`).
+- **Vendor-theme-1** (`feature/launcher-vendor-theme-1`, 2026-11-11): `openjar-addons` v0.2.1 (9c91639) re-vendored;
+  V-04 partial to built. Recount: 79 rows: 64 built, 11 superseded, 3 partial, 1 missing. `scripts/tools/test.sh`
+  (clean import first) exits 0: 170 test cases, 0 failures (`handoff/test-output.txt`).
 - **Gap-close-3** (`feature/launcher-gap-close-3`, 2026-11-11): C-01, C-14, S-02 to built; test run
   `scripts/tools/test.sh` (user data under `.scratch/`) exits 0: 165 test cases, 0 failures (`handoff/test-output.txt`).
 - **Status values:** built / partial / missing / superseded / dropped / later (see `~/openjar/lanes/plan-status-format.md`).
@@ -117,7 +120,7 @@ Sources (oldest first):
 | V-01 | S2 Art, Open questions | "Open Jar Games" wordmark and jar icon; Kaden approves one of three | partial | `art/logo/option_a.svg`, `option_b.svg`, `option_c.svg`, `compare.png` | There's no recorded pick, and no logo appears anywhere in the hub (only in `store/grid.png`). Gap-close-3: skipped, needs Kaden's pick. |
 | V-02 | S2 Art | The master palette is born here: three options, Kaden picks | partial | `art/palettes/candy_pop.json`, `cool_arcade.json`, `warm_toybox.json` | There's no recorded pick. The hub uses its own palette (`docs/hub-art-direction.md`). Gap-close-3: skipped, needs Kaden's pick. |
 | V-03 | S2 Camera, Art | 2D flat vector, a fixed 2D UI at 1080p, intro via `AnimationPlayer` | superseded | `scenes/hub/hub.tscn` (3D, Forward+); commit `1d71b82` | Superseded by S3, but GAME.md still describes the 2D launcher (see "Unrecorded"). |
-| V-04 | S2 Lanes | The launcher's theme becomes the `openjar-addons` theme | partial | `scenes/ui/theme.tres`, `addons/openjar/` (vendored v0.2.0), `tests/test_openjar_addon.gd::test_addon_version_is_0_2_0`, `::test_theme_resource_loads` | Vendor-addons-1: `openjar-addons` tag `v0.2.0` (b074b4c) is now vendored as a plain tree at `addons/openjar/` (no submodule; `VENDORED.md`). Still partial because v0.2.0 ships no theme: `theme/` holds only `.gitkeep` (its README: "TODO: first real asset from the launcher"), and it has no shared input or save code (`ui/`, `launcher/` are `.gitkeep`; autoloads stay in the template). Nothing to swap to, so `scenes/ui/theme.tres` is unchanged (no scene uses it; no visual change). Closes when `openjar-addons` takes `theme.tres` as `theme/openjar_theme.tres`, tags it, and it is re-vendored here; `test_theme_resource_loads` then loads the addon's theme. |
+| V-04 | S2 Lanes | The launcher's theme becomes the `openjar-addons` theme | built | `addons/openjar/theme/openjar_theme.tres` (vendored v0.2.1), `tests/test_openjar_addon.gd::test_theme_resource_loads`, `::test_addon_theme_matches_generator_output`, `::test_addon_version_is_0_2_1`; run in `handoff/test-output.txt` | Vendor-theme-1: `openjar-addons` tag `v0.2.1` (9c91639) re-vendored as a plain tree at `addons/openjar/` (`addons/openjar/VENDORED.md`). It ships the house theme as `theme/openjar_theme.tres`, a byte copy of `scenes/ui/theme.tres`; the launcher test now loads the addon's theme only (the `scenes/ui/theme.tres` fallback is gone). `scenes/ui/theme.tres` stays as the output of `art/gen/build.py` (one source); `art/prompts/README.md` says it is copied into the addon, and `test_addon_theme_matches_generator_output` fails if the two drift. No scene sets a theme yet, so no visual change. Shared input/save code (`ui/`, `launcher/`) is still `.gitkeep` upstream; not part of this row. |
 | V-05 | S2 Lanes | Profile faces | superseded | see C-08 | |
 | V-06 | S1 What we were missing | Store art: 600x900 grid, 920x430 hero (and `clip.mp4`) | built | `store/grid.png` (600x900), `store/hero.png` (920x430), `store/clip.mp4` (9 s, 1280x720, no audio), all from real intro frames; `assets/CREDITS.md` | Shows Jar Island, the roster and the option A logo stand-in; redo after V-01 (the same shots recipe). The jars hold the test fixture games. |
 | V-07 | S3 | Jar Island at magic hour (`docs/hub-art-direction.md`) | built | frames `boot/t000.4s.png`, `boot/t004.0s.png` | |
@@ -187,4 +190,4 @@ Re-ranked 2026-11-10 by the gap-close lane. S = an hour or so, M = a lane sessio
 4. **S-02 / K-06 / K-07: one launch on the TV.** Read the `launcher: window:` lines, the F3 frame rate and the
    `launcher: interactive` line (its marks say where the time went). **S**
 5. **A-05 / A-04: the Audio lane restyles the five placeholder launch cues and a hub music loop.** **M**
-6. **V-04: move the theme into `openjar-addons`.** Kaden won't see this. **S**
+6. ~~**V-04: move the theme into `openjar-addons`.**~~ Done (vendor-theme-1, v0.2.1). **S**

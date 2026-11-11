@@ -2,6 +2,18 @@
 
 Games pin a tag (`addons/openjar` submodule). Every change bumps the tag; `plugin.cfg` matches it.
 
+## 0.2.1
+
+
+### `theme/` (first real asset; from the launcher)
+- `openjar_theme.tres`: the house UI theme, copied verbatim from openjar-launcher
+  `scenes/ui/theme.tres` (origin/dev ea2a417). Self-contained (StyleBoxFlat sub-resources only,
+  engine default font, no `res://` paths). Styles `Button` (normal/hover/pressed/disabled/focus +
+  font colours), `Label`, `LabelOnSky`, `Panel`, `PanelContainer`, `PanelAccent`, `PanelDark`,
+  `ProgressBar`; `default_font_size` 44. Usage in `theme/README.md`.
+- Test `tests/project/suites/test_theme.gd` (7 cases; 83 total).
+- `plugin.cfg` stays 0.2.0 until the tag (intended 0.2.1).
+
 ## 0.2.0 (2026-11-10, branch feature/extract-hill-engine; tag by Gary)
 
 **Layout change:** the repo root is now the addon root (`plugin.cfg` at the top). Games mount the
