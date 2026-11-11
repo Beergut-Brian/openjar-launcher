@@ -1,6 +1,8 @@
 # Launch checklist: openjar-launcher
 
-Launch-readiness lane, 2026-11-10. The audit below was written before any fix; the verified / TV / Kaden lists follow it once done.
+Launch-readiness lane, 2026-11-10/11. The audit was written before any fix (every row in it is now
+fixed or listed below); then what's verified on the producer box, what needs the TV box, what needs
+Kaden and what needs Gary. Row ids are PLAN-STATUS ids.
 
 ## Audit (before any fix)
 
@@ -26,6 +28,53 @@ row whose notes say something is rough:
 | K-11 | built | voices not credited to their tool; no ElevenLabs line | Fix: a Character voices section. |
 | (new) drop-out | — | P2's pad going away was silent | Fix: `player_leave` cue + a hop (CLAUDE.md #7). |
 | (new) quit mid-launch | — | Start held to the end during the launch animation quit the hub while the GO beat could still start the game behind it | Fix: never start a game once quitting; test. |
+| (found later) quit mid-intro | — | quitting during the intro leaked the crowd's voice streams at exit ("resources still in use") | Fixed: `Audio.quit` pauses the tree and silences every player in it; test. |
+| (found later) shipped docs | — | GAME.md (Kaden's name, quotes) and the store art were packed into the export, unused | Fixed: export filter. |
 | (new) version | — | no version anywhere; `config/version` is the template's `0.0.1` | Fix: release.yml stamps the tag; a quiet corner label; the boot log line. |
 | (new) README | — | still the template's README | Fix: launcher README with play instructions. |
 | (new) GAME.md Controls | — | two stale rows (one-press Start, a second LB+RB row) contradict the gap-close decisions | Fix the two rows; the stale 2D Pitch/Core loop/Camera/Art sections stay listed for Hermes. |
+
+## Verified on the producer box (2026-11-10/11, `feature/launch-ready-1`)
+
+- **Tests:** gdUnit4 `--ignoreHeadlessMode --continue`, all green (`handoff/test-output.txt`), including
+  `tests/test_launch_ready.gd` (8 tests: the whole session, quit from the intro, quit mid-launch,
+  P2 drop-out, the swap cue, the cheer, the version label, quitting mid-intro silences every voice).
+- **Session flow in real frames** (`handoff/frames/flow_*`): intro (the roster tumbles out, logo
+  thump, glide out), the chooser with P2 in (name tags, hints), P2 dropping out, the quit badge
+  filling, launch (rattle, flash, game runs) and return (pop out, lid back). Dev jar lid and the empty
+  hub re-checked (`c07_*`, `c16_*`).
+- **Soak:** 30 min headless (leaks) and 30 min rendered at 960x540 (frame time), scripted launches,
+  returns, swaps, P2 in and out; numbers in `handoff/REPORT.md`.
+- **Export:** exported, zipped like release.yml, unzipped, booted: launch, return, Start-hold quit,
+  exit 0, zero errors. Design docs, store art, kiosk files and the template player scene are out of
+  the pack; scripts ship as binary tokens (no comments).
+- **Hygiene:** version from the release tag (corner label + log); credits for every asset including
+  the ElevenLabs voices; README play instructions; no personal info or real places in shipped files.
+
+## Needs the TV box (the weekend)
+
+- [ ] K-06: F3 on the GTX 1060, 1080p: 60 fps in the hub, the intro (22 characters) and a launch.
+- [ ] K-07: cold start under 10 s: read the `launcher: interactive` line.
+- [ ] S-02: one launch and return: read the `launcher: window:` lines (minimised while the game runs,
+      fullscreen and in front after).
+- [ ] C-14: install Smash Party (`kiosk/smash-party/install.sh`), launch it, play with a pad in the
+      browser, quit it with the browser's close and with the 2 s Start hold.
+- [ ] Real pads: P2 drops in with a button, drops out by switching the pad off (the "bye-bye"),
+      Select changes character per pad, LB+RB 1 s shows the dev jars, Start held 1.5 s quits to Steam.
+- [ ] The corner shows the release tag (`v…`) and is small enough to ignore on the TV.
+
+## Needs Kaden
+
+- [ ] V-01: pick a logo (`art/logo/compare.png`, options A/B/C). Then swap
+      `assets/sprites/logo/intro_logo.png` and re-shoot `store/` (recipe in the gap-close report).
+- [ ] V-02: pick a palette (`art/palettes/compare.png`).
+- [ ] (Optional) K-02: keep Start as a 1.5 s hold, or one press back.
+
+## Needs Gary
+
+- [ ] Voices for Jeff, Chuck, Bloom and Old Reel in `openjar-characters` (cue names the launcher
+      uses: `catchphrase`, `cheer`, `join`, `ready`, `swap_in`, `win`), then
+      `scripts/tools/sync_characters.sh`. Until then they land and swap silently.
+- [ ] C-01 / C-14: after the weekend playtest, `dev` → `main`, tag `v0.1.0`, boot the stable tile.
+- [ ] V-04: move `scenes/ui/theme.tres` into `openjar-addons` (another repo; Kaden never sees it).
+- [ ] A-04 (optional, Audio lane): a longer hub loop; the 18 s loop repeats a lot in free roam.
