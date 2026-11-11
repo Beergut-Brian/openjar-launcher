@@ -34,3 +34,23 @@ func test_the_log_line_says_when_the_window_manager_ignores_us() -> void:
 	assert_str(WindowPolicy.report(false, FULL, FULL)).contains("restore after the game, done")
 	assert_str(WindowPolicy.report(true, MIN, DisplayServer.WINDOW_MODE_WINDOWED)) \
 		.contains("the window manager kept mode 0")
+
+
+func test_the_log_line_says_how_long_the_window_manager_took_and_if_it_took_two_tries() -> void:
+	assert_str(WindowPolicy.report(true, MIN, MIN, 240)).is_equal(
+			"window: minimise while the game runs, done (mode %d) after 240 ms" % MIN)
+	assert_str(WindowPolicy.report(false, FULL, FULL, 1700, true)).ends_with("after 1700 ms, on the second try")
+	assert_str(WindowPolicy.report(false, FULL, MIN, 3000, true)) \
+		.contains("the window manager kept mode %d after 3000 ms" % MIN)
+
+
+func test_a_restore_that_did_not_take_goes_through_windowed() -> void:
+	var WIN := DisplayServer.WINDOW_MODE_WINDOWED
+	assert_array(WindowPolicy.retry_steps(FULL)).is_equal([WIN, FULL])
+	assert_array(WindowPolicy.retry_steps(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)) \
+		.is_equal([WIN, DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN])
+	assert_array(WindowPolicy.retry_steps(WIN)).is_equal([WIN])
+
+
+func test_the_settle_wait_is_short() -> void:
+	assert_float(WindowPolicy.SETTLE_STEP * WindowPolicy.SETTLE_CHECKS).is_less_equal(2.0)

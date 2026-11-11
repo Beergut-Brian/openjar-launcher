@@ -84,6 +84,7 @@ var _dived := false                      # the camera is inside the jar (until t
 var _cam_snap := false
 var _flash: ColorRect
 var _window_mode_before_run := -1
+var _window_check := 0                   # bumped on every launch and return (S-02 settle wait)
 var _input_from_ms := 0
 var _dev_combo := HoldCombo.new(1.0)
 var _quit_combo := HoldCombo.new(QUIT_HOLD)
@@ -862,7 +863,31 @@ func _apply_window_policy(running: bool) -> void:
 	DisplayServer.window_set_mode(mode)
 	if not running:
 		DisplayServer.window_move_to_foreground()
-	print("launcher: %s" % WindowPolicy.report(running, mode, DisplayServer.window_get_mode()))
+	_window_check += 1
+	_settle_window(running, mode, _window_check)
+
+
+## S-02: the window manager applies the mode some frames later, so wait for it before logging (the
+## TV's log line is the proof), and if a restore has not taken, try once more (via windowed).
+## A newer launch or return (`check` is stale) ends the wait.
+func _settle_window(running: bool, asked: int, check: int) -> void:
+	var start := Time.get_ticks_msec()
+	var retried := false
+	for attempt in 2:
+		for i in WindowPolicy.SETTLE_CHECKS:
+			if DisplayServer.window_get_mode() == asked:
+				break
+			await get_tree().create_timer(WindowPolicy.SETTLE_STEP, true, false, true).timeout
+			if check != _window_check:
+				return
+		if running or DisplayServer.window_get_mode() == asked or attempt == 1:
+			break
+		retried = true
+		for step: int in WindowPolicy.retry_steps(asked):
+			DisplayServer.window_set_mode(step)
+		DisplayServer.window_move_to_foreground()
+	print("launcher: %s" % WindowPolicy.report(running, asked, DisplayServer.window_get_mode(),
+			Time.get_ticks_msec() - start, retried))
 
 
 ## The picks on screen, for the game's --p1-char= / --p2-char= (its Roster reads them first).
