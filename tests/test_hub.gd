@@ -535,7 +535,8 @@ func test_the_hint_shows_by_the_ring_when_you_stand_still() -> void:
 	assert_bool(me.hint_visible()).is_false()
 	_step(hub, 1.6)
 	assert_bool(me.hint_visible()).is_true()
-	assert_str(me._hint.text).ends_with("Change")
+	assert_object(me._hint.texture).is_not_null()   # a picture of the button, no words (K-01)
+	assert_str(me._hint.get_class()).is_equal("Sprite3D")
 	assert_bool(hub.jarlings[1]._hint.visible).is_false()    # the tag-along has no hint
 	_stick(Vector2(1, 0))
 	_step(hub, 0.25)

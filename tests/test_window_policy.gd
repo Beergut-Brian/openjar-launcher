@@ -27,3 +27,10 @@ func test_off_leaves_window_alone() -> void:
 func test_launcher_default_is_minimise() -> void:
 	var script: GDScript = load("res://scripts/hub/hub.gd")
 	assert_bool(script.MINIMIZE_WHILE_RUNNING).is_true()
+
+
+func test_the_log_line_says_when_the_window_manager_ignores_us() -> void:
+	assert_str(WindowPolicy.report(true, MIN, MIN)).contains("done")
+	assert_str(WindowPolicy.report(false, FULL, FULL)).contains("restore after the game, done")
+	assert_str(WindowPolicy.report(true, MIN, DisplayServer.WINDOW_MODE_WINDOWED)) \
+		.contains("the window manager kept mode 0")

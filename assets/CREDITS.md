@@ -33,8 +33,10 @@ One line per file. Nothing enters `assets/` without a line here.
 | `art/logo/option_c.png` | Pillow script `art/gen/build.py` | 1200x600 render of option_c.svg shapes | Original work, Open Jar Games |
 | `art/logo/compare.png` | Pillow script `art/gen/build.py` | 1920x1080 sheet: A/B/C on sky, on light, at phone/icon size | Original work, Open Jar Games |
 | `scenes/ui/theme.tres` | Pillow script `art/gen/build.py` | house UI theme: rounded panels, thick ink borders, palette colours; engine default font (no open chunky font offline) | Original work, Open Jar Games |
-| `store/grid.png` | Pillow script `art/gen/build.py` | 600x900 launcher store card: logo A, Jeff/Chuck stand-ins, burst, hills | Original work, Open Jar Games |
-| `store/hero.png` | Pillow script `art/gen/build.py` | 920x430 launcher banner: logo A, Jeff/Chuck stand-ins, burst, hills | Original work, Open Jar Games |
+| `store/grid.png` | real frame of the launcher's own intro (`scripts/tools/shots.sh`, HUB_DEMO=`intro;follow`, fixture jars `tests/fixtures/hub_8`), cropped 720x1080 and scaled with Pillow | 600x900 launcher store card: Jar Island, the roster out of the jar under logo A (stand-in until Kaden's V-01 pick) | Original work, Open Jar Games (characters: openjar-characters, logo: `art/logo/option_a`) |
+| `store/hero.png` | real frame of the launcher's own intro (as grid.png), cropped 1920x897 and scaled with Pillow | 920x430 launcher banner: Jar Island, the jars and the roster under logo A | Original work, Open Jar Games |
+| `assets/sprites/logo/intro_logo.png` | copy of `art/logo/option_a.png` (Pillow script `art/gen/logos.py`) | the logo that thumps down in the hub intro; stand-in until Kaden picks (V-01), swap this one file | Original work, Open Jar Games |
+| `store/clip.mp4` | 90 real frames of the intro and camera glide (as grid.png, 1280x720, 10 fps) encoded with ffmpeg (x264) | 9 s launcher store clip, no audio | Original work, Open Jar Games |
 | `assets/shaders/hub/sky.gdshader` | hand-written Godot shader | magic-hour sky gradient, sun disc, stars; static (no TIME) | Original work, Open Jar Games |
 | `assets/shaders/hub/jar_glass.gdshader` | hand-written Godot shader | game-jar glass: fresnel rim, streak highlights, accent tint | Original work, Open Jar Games |
 | `assets/shaders/hub/beam.gdshader` | hand-written Godot shader | additive light beam above the jar a Jarling stands at | Original work, Open Jar Games |

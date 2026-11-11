@@ -2,7 +2,7 @@
 ## Flow: boot → hub (standing at the last game's jar) → A → launch animation (LaunchSequence: lid
 ## spins off, Jarling leaps in, camera dives into the jar's tiny world) → (game runs) → pop back out.
 ## Owns the Save keys (LauncherState), the manifest list and the child process.
-## Start quits to Steam (exit code 0) except while a game runs.
+## Holding Start for QUIT_HOLD s quits to Steam (exit code 0), except while a game runs (K-02).
 extends Node3D
 
 enum Screen { HUB, RUNNING }
@@ -16,6 +16,9 @@ const MINIMIZE_WHILE_RUNNING := true
 const DEMO_STOP := 0.5            # --demo: a walking Jarling counts as "there" this close to the stand point
 const DEMO_PAUSE := 1.6           # --demo tour: how long it stands at each jar before walking on
 const INTRO_SECONDS := 2.6        # the camera glides in from the wide shot; input works throughout
+## The wide shot: where the camera glide starts, and where the intro (HubIntro) ends.
+const WIDE_POS := Vector3(0, 10.5, 27)
+const WIDE_LOOK := Vector3(0, 1.5, -3)
 const SKY_SHADER := preload("res://assets/shaders/hub/sky.gdshader")
 ## Fallback bodies by profile id, only if the Roster has no model for a pick (no data/roster.json).
 const MODELS := {
@@ -37,11 +40,18 @@ const CHANGE_SOUND := "intro_pop"  # the chooser's swap sound, at once on every 
 ## since presses are ignored mid-swap (0.39 s, longer than the settle). Fast scrolling says only the
 ## one you stop on; standing still says nothing more.
 const SAY_SETTLE := 0.3
+## K-02: Start must be held this long to leave the launcher; a tap only ticks and shows the badge.
+const QUIT_HOLD := 1.5
+## A-05: the launching character's own voice on top of the beat sounds: a happy bark as it leaps
+## into the jar, another as it pops back out. First one the character has; none: just the beat sound.
+const LEAP_BARKS := ["ready", "cheer", "join"]
+const RETURN_BARKS := ["win", "join", "cheer"]
 const SUN_DIR := Vector3(0.42, 0.2, -1.0)   # the sun you see: low behind the jars, a little to the right
 ## The light itself comes from higher up on the same bearing, so shadows stay short and crisp.
 const LIGHT_DIR := Vector3(0.42, 0.46, -1.0)
 
 signal launched(slug: String, profile_id: String)
+signal quitting
 
 var screen: Screen = Screen.HUB
 var root_dir := ""
@@ -70,10 +80,16 @@ var _flash: ColorRect
 var _window_mode_before_run := -1
 var _input_from_ms := 0
 var _dev_combo := HoldCombo.new(1.0)
+var _quit_combo := HoldCombo.new(QUIT_HOLD)
+var _quit_down := false
+var _quitting := false
+var _demo_quit_until := 0.0
+var quit_meter: QuitMeter
+var really_quit := true                  # tests turn this off to see the hold without quitting
 var _intro := 0.0
 var _intro_hold := false
-var _cam_pos := Vector3(0, 10.5, 27)
-var _cam_look := Vector3(0, 1.5, -3)
+var _cam_pos := WIDE_POS
+var _cam_look := WIDE_LOOK
 var _clock := 0.0
 var _demo: Array = []
 var _demo_move := Vector2.ZERO
@@ -84,6 +100,9 @@ var _demo_tour_dir := 1
 var _demo_rest := 0.0
 ## Chooser voice: seconds until this player's catchphrase; < 0 nothing pending.
 var _say_in := { Players.P1: -1.0, Players.P2: -1.0 }
+## The opening (first boot of each day; A skips). null when it is not playing.
+var intro: HubIntro = null
+var _demo_zero := 0.0                    # demo times count from here (the end of the intro, if any)
 
 @onready var camera: Camera3D = $Camera
 @onready var world: Node3D = $World
@@ -129,6 +148,8 @@ func _ready() -> void:
 	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_flash.color = Color(1, 1, 1, 0)
 	layer.add_child(_flash)
+	quit_meter = QuitMeter.new()
+	layer.add_child(quit_meter)
 	root_dir = ManifestScanner.default_root()
 	two_players = Players.is_active(Players.P2)
 	Players.player_joined.connect(_on_player_joined)
@@ -139,9 +160,53 @@ func _ready() -> void:
 	process_watch.wait_time = POLL_SECONDS
 	process_watch.timeout.connect(_on_process_watch)
 	_parse_demo(demo)
-	Audio.music("card_row_loop")
+	if wants_intro(demo, OS.get_cmdline_args(), LauncherState.should_play_intro(Save, LauncherState.today())):
+		if demo.is_empty():
+			LauncherState.mark_intro_played(Save, LauncherState.today())
+			Save.flush()
+		play_intro()
+	else:
+		Audio.music("card_row_loop")
 	_update_camera(0.0)
 	_report_cold_start()
+
+
+## The intro plays on the first boot of each local day (GAME.md decisions), or when a demo script asks
+## for it ("intro"). Other demo and shots runs, and test runs, never play it on their own.
+static func wants_intro(demo: String, args: PackedStringArray, first_boot_today: bool) -> bool:
+	if "intro" in demo.split(";", false):
+		return true
+	if not demo.is_empty() or Roster.is_test_run(args):
+		return false
+	return first_boot_today
+
+
+func intro_playing() -> bool:
+	return intro != null and is_instance_valid(intro) and intro.active
+
+
+## The opening: the whole playable roster tumbles out of a big jar (HubIntro). The Jarlings wait
+## out of sight and pop in when it ends (or A skips it).
+func play_intro(who: Array[String] = HubIntro.cast()) -> HubIntro:
+	intro = HubIntro.new()
+	add_child(intro)
+	intro.finished.connect(_on_intro_finished)
+	for n: HubJarling in jarlings + residents:
+		n.visible = false
+	intro.start(who)
+	_intro = 0.0
+	return intro
+
+
+func _on_intro_finished() -> void:
+	intro = null
+	_demo_zero = _clock
+	_intro = 0.0   # the hub's glide carries on from the wide shot the intro ended on
+	for j in jarlings:
+		j.visible = true
+		HubJarling.poof(self, j.position + Vector3(0, 0.6, 0), j.color)
+		j.cheer(0.8)
+	_update_residents()
 
 
 ## Kid-design target: cold start to playing in under 10 s. Ticks count from engine start.
@@ -151,18 +216,28 @@ func _report_cold_start() -> void:
 		spots.size(), Time.get_ticks_msec(), Time.get_unix_time_from_system()])
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if screen == Screen.RUNNING:
-		return
-	if event.is_action_pressed("launcher_quit"):
-		get_viewport().set_input_as_handled()
+## Start, held: the badge's ring fills and at QUIT_HOLD s the launcher quits. A tap ticks and lets go.
+## Ignored while a game runs. True on the frame it quits.
+func update_quit(down: bool, delta: float) -> bool:
+	if screen == Screen.RUNNING or _quitting:
+		down = false
+	if down and not _quit_down:
+		Audio.play("ui_move")   # every press sounds, even one that does nothing yet
+	_quit_down = down
+	var go := _quit_combo.update(down, down, delta)
+	quit_meter.progress = 1.0 if go else _quit_combo.progress()
+	if go:
 		quit_to_steam()
+	return go
 
 
 func quit_to_steam() -> void:
+	_quitting = true
 	Audio.play("ui_back")
 	Save.flush()
-	set_process_unhandled_input(false)
+	quitting.emit()
+	if not really_quit:
+		return   # tests
 	await get_tree().create_timer(0.25).timeout   # let the cue be heard
 	Audio.quit(0)
 
@@ -299,8 +374,14 @@ func pick_profile(id: String) -> void:
 func _process(delta: float) -> void:
 	_clock += delta
 	_run_demo()
+	update_quit(Input.is_action_pressed("launcher_quit") or _clock < _demo_quit_until, delta)
 	voice_step(delta)
-	if screen == Screen.HUB and not launch.active and Time.get_ticks_msec() >= _input_from_ms:
+	if intro_playing():
+		for p: int in [Players.P1, Players.P2]:
+			if Input.is_action_just_pressed(Players.action(p, "action")):
+				intro.skip()
+				break
+	elif screen == Screen.HUB and not launch.active and Time.get_ticks_msec() >= _input_from_ms:
 		_read_players()
 		if _dev_combo.update(Input.is_action_pressed("launcher_lb"), Input.is_action_pressed("launcher_rb"), delta):
 			_toggle_dev()
@@ -421,6 +502,38 @@ func voice_step(delta: float) -> void:
 				Roster.last_said.get(p, "") if ok else "(no voice)", Time.get_ticks_msec() / 1000.0])
 
 
+## The first of `names` that this Jarling's character has as a voice bark, on its player's voice
+## (a tag-along uses the shared one). The path said, or "" if it has none (the beat sound covers it).
+func shout(j: HubJarling, names: Array) -> String:
+	var path := bark_path(Roster.info(j.character_id), names)
+	if path == "":
+		return ""
+	var player := -1
+	if j == lead_jarling():
+		player = Players.P1
+	elif two_players:
+		player = Players.P2
+	var v := Roster.voice_player(player)
+	if v == null:
+		return ""
+	v.stop()
+	v.stream = load(path)
+	v.play()
+	return path
+
+
+static func bark_path(info: Dictionary, names: Array) -> String:
+	var voice: String = info.get("voice", "")
+	var barks: Array = info.get("barks", [])
+	if voice == "":
+		return ""
+	for b: String in names:
+		var path := "%s%s.ogg" % [voice, b]
+		if barks.has(b) and ResourceLoader.exists(path):
+			return path
+	return ""
+
+
 ## A Roster character's model, or null if it has none (the hub then keeps the fallback body).
 func character_scene(id: String) -> PackedScene:
 	var who := Roster.info(id)
@@ -457,14 +570,15 @@ func _update_residents() -> void:
 		r.visible = jarlings.all(func(j: HubJarling) -> bool: return j.character_id != r.character_id)
 
 
-## "<button> Change" by each held ring: Select on a pad, the player's key with no pad at all.
+## The chooser hint by each held ring, a picture (K-01): the pad's Select button and swap arrows in
+## the player's colour; with no pad at all, the player's key (Tab for P1, slash for P2).
 func _update_hints() -> void:
 	var pads := not Input.get_connected_joypads().is_empty()
 	for p: int in [Players.P1, Players.P2]:
 		var j := jarling_for(p)
 		if j != null:
-			var key := "Tab" if p == Players.P1 else "/"
-			j.set_hint_text("%s  Change" % ("Select" if Players.device_of(p) >= 0 or pads else key))
+			var key := HintGlyph.Kind.TAB if p == Players.P1 else HintGlyph.Kind.SLASH
+			j.set_hint_glyph(HintGlyph.Kind.SELECT if Players.device_of(p) >= 0 or pads else key, Players.COLOR[p])
 
 
 ## Before any pad joins, P1 and P2 pad events both match every device; only the keyboard can tell
@@ -566,6 +680,7 @@ func _on_launch_beat(beat: int) -> void:
 		LaunchSequence.Beat.LEAP:
 			Audio.play("jarling_jump")
 			j.set_expression("happy")
+			shout(j, LEAP_BARKS)   # "here I go!" in the character's own voice
 		LaunchSequence.Beat.LID_LAND:
 			Audio.play("lid_land")
 			if _lid_lands_on(friend):
@@ -641,6 +756,7 @@ func _play_return(j: HubJarling) -> void:
 	if f >= 0:
 		var spot := spots[f]
 		Audio.play("jar_pop_out")
+		shout(j, RETURN_BARKS)   # "I'm back!"
 		spot.splash()
 		spot.drop_lid(0.5)
 		j.jump_out(spot.mouth_position(), spot.stand_point if j == lead_jarling() else _launch_from)
@@ -679,6 +795,7 @@ func _apply_window_policy(running: bool) -> void:
 	DisplayServer.window_set_mode(mode)
 	if not running:
 		DisplayServer.window_move_to_foreground()
+	print("launcher: %s" % WindowPolicy.report(running, mode, DisplayServer.window_get_mode()))
 
 
 ## The picks on screen, for the game's --p1-char= / --p2-char= (its Roster reads them first).
@@ -704,6 +821,13 @@ func _update_camera(delta: float) -> void:
 	if launch.active or _dived:
 		_launch_camera()
 		return
+	if intro_playing():
+		var pose := intro.camera_pose(WIDE_POS, WIDE_LOOK)
+		_cam_pos = pose[0]
+		_cam_look = pose[1]
+		camera.fov = 52.0
+		camera.look_at_from_position(_cam_pos, _cam_look)
+		return
 	if not _intro_hold:
 		_intro = minf(_intro + delta / INTRO_SECONDS, 1.0)
 	var centre := Vector3.ZERO
@@ -725,8 +849,8 @@ func _update_camera(delta: float) -> void:
 		back = 8.4
 	var want := Vector3(centre.x * 0.62, height, centre.z + back)
 	var k := smoothstep(0.0, 1.0, _intro)
-	want = Vector3(0, 10.5, 27).lerp(want, k)
-	look = Vector3(0, 1.5, -3).lerp(look, k)
+	want = WIDE_POS.lerp(want, k)
+	look = WIDE_LOOK.lerp(look, k)
 	var ease := 1.0 if delta <= 0.0 or _cam_snap else 1.0 - exp(-delta * 4.5)
 	_cam_snap = false
 	_cam_pos = _cam_pos.lerp(want, ease)
@@ -840,6 +964,8 @@ func _parse_demo(text: String) -> void:
 
 
 func _run_demo() -> void:
+	if intro_playing():
+		return   # the script waits for the intro; its times count from the intro's end
 	if _demo_tour and _demo_goal[Players.P1] < 0 and spots.size() > 1 and not launch.active:
 		_demo_rest -= get_process_delta_time()
 		if _demo_rest <= 0.0:
@@ -848,9 +974,11 @@ func _run_demo() -> void:
 				_demo_tour_dir = -_demo_tour_dir
 			_demo_goal[Players.P1] = at + _demo_tour_dir
 			_demo_rest = DEMO_PAUSE
-	while not _demo.is_empty() and _clock >= float(_demo[0][0]):
+	while not _demo.is_empty() and _clock - _demo_zero >= float(_demo[0][0]):
 		var d: PackedStringArray = _demo.pop_front()
 		match d[1]:
+			"intro": pass   # handled in _ready (wants_intro)
+			"holdstart": _demo_quit_until = _clock + float(d[2])   # hold Start this long (frames of the badge)
 			"wide": _intro_hold = true
 			"follow": _intro_hold = false
 			"go": _demo_goal[Players.P1] = clampi(int(d[2]), 0, spots.size() - 1)
