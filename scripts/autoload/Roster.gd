@@ -223,10 +223,15 @@ func voice_player(player := -1) -> AudioStreamPlayer:
 	return _slot_voice.get(player, _voice)
 
 
-func _say(player: int, id: String, path: String) -> bool:
-	if not ResourceLoader.exists(path):
+## The one call that plays a character's voice line (docs/roster.md "Chooser voice"): the chooser's
+## catchphrase and barks, the intro's landing barks and the launch shouts all come through here.
+## Cuts off what that voice was saying, records last_said, emits said. `on`: play on this player
+## instead of the slot's voice (the intro's crowd voices, which keep their own cap). False (nothing
+## plays) if the file isn't there.
+func say(player: int, id: String, path: String, on: AudioStreamPlayer = null) -> bool:
+	if path == "" or not ResourceLoader.exists(path):
 		return false
-	var v := voice_player(player)
+	var v := on if on != null else voice_player(player)
 	if not v:
 		return false
 	v.stop()
@@ -236,6 +241,10 @@ func _say(player: int, id: String, path: String) -> bool:
 	last_said[key] = path
 	said.emit(key, id, path)
 	return true
+
+
+func _say(player: int, id: String, path: String) -> bool:
+	return say(player, id, path)
 
 
 func _first_free(player: int) -> String:

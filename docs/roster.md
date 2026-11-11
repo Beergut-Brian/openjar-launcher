@@ -90,6 +90,10 @@ once. Give a little audio cue of who they are." Same behaviour as the template's
 - **The line**: the character's `voice/catchphrase.ogg`; without one a random bark; neither (Jeff,
   Chuck, Bloom, Old Reel in `v0.5.0`): nothing more, the step's swap sound already sounded.
 - The log says what played when: `Chooser voice: P1 boxbot res://.../catchphrase.ogg (t=5.83 s)`.
+- **One voice call.** `Roster.say(player, id, path, on = null)` is the only thing that plays a
+  character line: the chooser's catchphrase / bark, the intro's landing barks (`HubIntro._say`, on
+  one of its 3 crowd voices, so never more than 3 at once; no voice: a `ui_move` tick) and the
+  launch shouts (`hub.gd` `shout()`). Every line emits `Roster.said` and sets `last_said`.
 - Tests: `tests/test_chooser_voice.gd` (fixture roster `tests/fixtures/roster_voice.json`, voice
   files in `tests/voice_fixture/`, outside the `.gdignore`d `tests/fixtures/`).
 
