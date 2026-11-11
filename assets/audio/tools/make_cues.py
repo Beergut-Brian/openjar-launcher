@@ -463,7 +463,7 @@ def card_row_loop(rng):
     return dc_block(soft(out, 9500.0, circular=True), circular=True)
 
 
-# Hub launch moment. Placeholders from the hub lane: the Audio lane is welcome to replace them.
+# Hub launch moment (rattle, jump, lid, splash, pop-out, bonk). Finished cues; the Audio lane may restyle them.
 TIN = ((1, 1.0, 1.0), (2.32, 0.5, 1.4), (3.9, 0.3, 2.0), (5.4, 0.15, 2.6))
 
 
