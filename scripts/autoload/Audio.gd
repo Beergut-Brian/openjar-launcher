@@ -12,6 +12,8 @@ var _pool: Array[AudioStreamPlayer] = []
 var _music: AudioStreamPlayer
 var _warned := {}
 var _cache := {}
+## The last cue play() was asked for (tests check "a sound on every action" with it).
+var last_cue := ""
 
 
 func _ready() -> void:
@@ -59,6 +61,7 @@ func release_all() -> void:
 
 
 func play(cue: String, _position = null) -> void:
+	last_cue = cue
 	var stream := _resolve(SFX_DIR, cue)
 	if stream == null:
 		return
