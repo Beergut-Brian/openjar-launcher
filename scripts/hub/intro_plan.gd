@@ -19,6 +19,8 @@ const HOLD := 1.4            # everybody cheers under the logo
 const BACK_GAP := 0.035      # then they hop back in, quickly one after another
 const BACK_FLIGHT := 0.45
 const OUTRO := 0.5           # the lid drops back on, the jar poofs away
+const SHAKE_TIME := 0.15     # the logo thump jolts the camera this long...
+const SHAKE_MAX := 0.05      # ...by at most this many metres, decaying to nothing
 const MAX_VOICES := 3        # landing voices at once: lively, never a wall of noise
 ## Happy barks to land with, in rotation (only the ones a character has). The last lander says its
 ## catchphrase instead, since it lands when the others have quietened down.
@@ -117,3 +119,14 @@ static func camera(t: float, n: int, wide_pos: Vector3, wide_look: Vector3) -> A
 	var pos := close_pos.lerp(mid_pos, spill).lerp(wide_pos, out)
 	var look := close_look.lerp(mid_look, spill).lerp(wide_look, out)
 	return [pos, look]
+
+
+## The thump's camera jolt `since` seconds after the logo lands: a quick wobble, mostly down (the
+## logo hits the ground), decaying to exactly zero at SHAKE_TIME. Zero before the thump too.
+static func shake(since: float) -> Vector3:
+	if since < 0.0 or since >= SHAKE_TIME:
+		return Vector3.ZERO
+	var k := since / SHAKE_TIME
+	var fade := (1.0 - k) * (1.0 - k)
+	var w := since * TAU / 0.05   # a 20 Hz wobble: three kicks in the 0.15 s
+	return (Vector3(sin(w * 1.3) * 0.35, -absf(cos(w)), 0) * SHAKE_MAX * fade).limit_length(SHAKE_MAX)

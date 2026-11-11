@@ -513,13 +513,7 @@ func shout(j: HubJarling, names: Array) -> String:
 		player = Players.P1
 	elif two_players:
 		player = Players.P2
-	var v := Roster.voice_player(player)
-	if v == null:
-		return ""
-	v.stop()
-	v.stream = load(path)
-	v.play()
-	return path
+	return path if Roster.say(player, j.character_id, path) else ""
 
 
 static func bark_path(info: Dictionary, names: Array) -> String:

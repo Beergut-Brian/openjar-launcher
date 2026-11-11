@@ -22,6 +22,7 @@ var t := 0.0
 var ids: Array[String] = []           # who tumbles out, in order (the roster with a body)
 var voiced: Array[String] = []        # what was said, in order (tests)
 var landed := 0
+var shake_at := -1.0               # intro time of the logo thump (its camera jolt); < 0 not yet
 
 var _chars: Array[Node3D] = []
 var _spots: Array[Vector3] = []
@@ -79,6 +80,7 @@ func start(who: Array[String]) -> void:
 	_next = 0
 	t = 0.0
 	landed = 0
+	shake_at = -1.0
 	active = true
 	_pose()
 
@@ -127,6 +129,7 @@ func _beat(kind: String, i: int) -> void:
 				Audio.play("ui_move")   # no voice (yet) for this one: a landing tick, never silent
 		"thump":
 			Audio.play("intro_thump")
+			shake_at = t   # the camera feels it land (IntroPlan.shake), only here: never the chooser or a launch
 			Audio.music("card_row_loop")
 			for c in _chars:
 				_play_anim(c, "cheer")
@@ -138,16 +141,17 @@ func _beat(kind: String, i: int) -> void:
 			_finish()
 
 
-## One landing voice on a free voice player; none free (MAX_VOICES talking already): false.
+## One landing voice, through the chooser's voice call (Roster.say), on a free crowd voice; none
+## free (MAX_VOICES talking already): false, and the caller plays the landing tick.
 func _say(i: int) -> bool:
 	var path := IntroPlan.voice_path(Roster.info(ids[i]), i, ids.size())
 	if path == "":
 		return false
 	for v in _voices:
 		if not v.playing:
-			v.stream = load(path)
 			v.pitch_scale = 1.0
-			v.play()
+			if not Roster.say(-1, ids[i], path, v):
+				return false
 			voiced.append(path)
 			return true
 	return false
@@ -166,8 +170,16 @@ func _finish() -> void:
 	queue_free()
 
 
+## The intro's camera: IntroPlan.camera plus the thump's jolt (moves eye and target together).
 func camera_pose(wide_pos: Vector3, wide_look: Vector3) -> Array[Vector3]:
-	return IntroPlan.camera(t, ids.size(), wide_pos, wide_look)
+	var pose := IntroPlan.camera(t, ids.size(), wide_pos, wide_look)
+	var jolt := shake_offset()
+	return [pose[0] + jolt, pose[1] + jolt]
+
+
+## The camera jolt right now (zero before the thump and from SHAKE_TIME after it).
+func shake_offset() -> Vector3:
+	return IntroPlan.shake(t - shake_at) if shake_at >= 0.0 else Vector3.ZERO
 
 
 # ---------------------------------------------------------------- posing

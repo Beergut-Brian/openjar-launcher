@@ -133,6 +133,70 @@ func test_landing_voices_never_pile_up() -> void:
 	assert_str(intro.voiced[0]).is_equal("res://tests/voice_fixture/cheer.ogg")
 
 
+func test_the_logo_thump_jolts_the_camera_and_the_jolt_dies_away() -> void:
+	var who: Array[String] = ["jeff", "chuck", "pip"]
+	var intro := _intro(who)
+	var thump := IntroPlan.thump_time(who.size())
+	var plain := func() -> Vector3: return IntroPlan.camera(intro.t, 3, Vector3(0, 10.5, 27), Vector3.ZERO)[0]
+	while intro.t < thump - 0.03:
+		intro.advance(0.02)
+		assert_vector(intro.shake_offset()).is_equal(Vector3.ZERO)   # nothing before the logo lands
+	assert_float(intro.shake_at).is_less(0.0)
+	intro.advance(thump - intro.t + 0.01)   # the thump beat fires
+	assert_float(intro.shake_at).is_greater_equal(0.0)
+	var biggest := 0.0
+	var last := INF
+	while intro.t < intro.shake_at + IntroPlan.SHAKE_TIME:
+		var jolt := intro.shake_offset()
+		biggest = maxf(biggest, jolt.length())
+		assert_float(jolt.length()).is_less_equal(IntroPlan.SHAKE_MAX + 0.0001)   # under 0.05 m
+		var pose := intro.camera_pose(Vector3(0, 10.5, 27), Vector3.ZERO)
+		assert_vector(pose[0] - plain.call()).is_equal_approx(jolt, Vector3.ONE * 0.0001)
+		intro.advance(0.01)
+	assert_float(biggest).is_greater(0.02)   # felt, not only heard
+	assert_float(IntroPlan.SHAKE_TIME).is_less_equal(0.15)
+	# it has decayed to nothing and stays there for the rest of the intro
+	assert_vector(intro.shake_offset()).is_equal(Vector3.ZERO)
+	while intro.active:
+		assert_vector(intro.shake_offset()).is_equal(Vector3.ZERO)
+		intro.advance(0.1)
+	# decaying: the envelope only shrinks
+	assert_float(IntroPlan.shake(0.12).length()).is_less(IntroPlan.SHAKE_MAX * 0.1)
+	assert_vector(IntroPlan.shake(-0.01)).is_equal(Vector3.ZERO)
+
+
+func test_landing_barks_go_through_the_chooser_voice_call_and_keep_their_cap() -> void:
+	Roster.data_path = VOICE
+	Roster.reload()
+	var heard: Array = []
+	var on_said := func(player: int, id: String, path: String) -> void: heard.append([player, id, path])
+	Roster.said.connect(on_said)
+	var who: Array[String] = ["ana", "bo", "cy", "ana", "bo", "cy", "ana", "bo", "dee", "eve"]
+	var intro := _intro(who)
+	var most := 0
+	while intro.active and intro.t < IntroPlan.thump_time(who.size()):
+		intro.advance(0.02)
+		most = maxi(most, intro.voices_playing())
+	Roster.said.disconnect(on_said)
+	assert_int(most).is_less_equal(IntroPlan.MAX_VOICES)   # the cap: never more than 3 at once
+	assert_int(most).is_greater(0)
+	# every landing line was said by Roster.say (the chooser's call), in the same order, on the shared key
+	assert_int(heard.size()).is_equal(intro.voiced.size())
+	for k in heard.size():
+		assert_int(heard[k][0]).is_equal(-1)
+		assert_str(heard[k][2]).is_equal(intro.voiced[k])
+	assert_str(heard[0][1]).is_equal("ana")
+	assert_bool(heard.any(func(h: Array) -> bool: return h[1] == "dee")).is_false()   # no voice: a tick
+	assert_str(Roster.last_said[-1]).is_equal(intro.voiced[-1])
+	# full: the call is refused before Roster.say, so nothing more is said
+	for v: AudioStreamPlayer in intro._voices:
+		v.stream = load("res://tests/voice_fixture/cheer.ogg")
+		v.play()
+	var before := intro.voiced.size()
+	assert_bool(intro._say(0)).is_false()
+	assert_int(intro.voiced.size()).is_equal(before)
+
+
 func test_skip_ends_it_at_once() -> void:
 	var intro := _intro(HubIntro.cast())
 	intro.advance(1.2)
