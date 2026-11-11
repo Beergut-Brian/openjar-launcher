@@ -16,6 +16,9 @@ const MINIMIZE_WHILE_RUNNING := true
 const DEMO_STOP := 0.5            # --demo: a walking Jarling counts as "there" this close to the stand point
 const DEMO_PAUSE := 1.6           # --demo tour: how long it stands at each jar before walking on
 const INTRO_SECONDS := 2.6        # the camera glides in from the wide shot; input works throughout
+## The wide shot: where the camera glide starts, and where the intro (HubIntro) ends.
+const WIDE_POS := Vector3(0, 10.5, 27)
+const WIDE_LOOK := Vector3(0, 1.5, -3)
 const SKY_SHADER := preload("res://assets/shaders/hub/sky.gdshader")
 ## Fallback bodies by profile id, only if the Roster has no model for a pick (no data/roster.json).
 const MODELS := {
@@ -72,8 +75,8 @@ var _input_from_ms := 0
 var _dev_combo := HoldCombo.new(1.0)
 var _intro := 0.0
 var _intro_hold := false
-var _cam_pos := Vector3(0, 10.5, 27)
-var _cam_look := Vector3(0, 1.5, -3)
+var _cam_pos := WIDE_POS
+var _cam_look := WIDE_LOOK
 var _clock := 0.0
 var _demo: Array = []
 var _demo_move := Vector2.ZERO
@@ -84,6 +87,9 @@ var _demo_tour_dir := 1
 var _demo_rest := 0.0
 ## Chooser voice: seconds until this player's catchphrase; < 0 nothing pending.
 var _say_in := { Players.P1: -1.0, Players.P2: -1.0 }
+## The opening (first boot of each day; A skips). null when it is not playing.
+var intro: HubIntro = null
+var _demo_zero := 0.0                    # demo times count from here (the end of the intro, if any)
 
 @onready var camera: Camera3D = $Camera
 @onready var world: Node3D = $World
@@ -139,9 +145,53 @@ func _ready() -> void:
 	process_watch.wait_time = POLL_SECONDS
 	process_watch.timeout.connect(_on_process_watch)
 	_parse_demo(demo)
-	Audio.music("card_row_loop")
+	if wants_intro(demo, OS.get_cmdline_args(), LauncherState.should_play_intro(Save, LauncherState.today())):
+		if demo.is_empty():
+			LauncherState.mark_intro_played(Save, LauncherState.today())
+			Save.flush()
+		play_intro()
+	else:
+		Audio.music("card_row_loop")
 	_update_camera(0.0)
 	_report_cold_start()
+
+
+## The intro plays on the first boot of each local day (GAME.md decisions), or when a demo script asks
+## for it ("intro"). Other demo and shots runs, and test runs, never play it on their own.
+static func wants_intro(demo: String, args: PackedStringArray, first_boot_today: bool) -> bool:
+	if "intro" in demo.split(";", false):
+		return true
+	if not demo.is_empty() or Roster.is_test_run(args):
+		return false
+	return first_boot_today
+
+
+func intro_playing() -> bool:
+	return intro != null and is_instance_valid(intro) and intro.active
+
+
+## The opening: the whole playable roster tumbles out of a big jar (HubIntro). The Jarlings wait
+## out of sight and pop in when it ends (or A skips it).
+func play_intro(who: Array[String] = HubIntro.cast()) -> HubIntro:
+	intro = HubIntro.new()
+	add_child(intro)
+	intro.finished.connect(_on_intro_finished)
+	for n: HubJarling in jarlings + residents:
+		n.visible = false
+	intro.start(who)
+	_intro = 0.0
+	return intro
+
+
+func _on_intro_finished() -> void:
+	intro = null
+	_demo_zero = _clock
+	_intro = 0.0   # the hub's glide carries on from the wide shot the intro ended on
+	for j in jarlings:
+		j.visible = true
+		HubJarling.poof(self, j.position + Vector3(0, 0.6, 0), j.color)
+		j.cheer(0.8)
+	_update_residents()
 
 
 ## Kid-design target: cold start to playing in under 10 s. Ticks count from engine start.
@@ -300,7 +350,12 @@ func _process(delta: float) -> void:
 	_clock += delta
 	_run_demo()
 	voice_step(delta)
-	if screen == Screen.HUB and not launch.active and Time.get_ticks_msec() >= _input_from_ms:
+	if intro_playing():
+		for p: int in [Players.P1, Players.P2]:
+			if Input.is_action_just_pressed(Players.action(p, "action")):
+				intro.skip()
+				break
+	elif screen == Screen.HUB and not launch.active and Time.get_ticks_msec() >= _input_from_ms:
 		_read_players()
 		if _dev_combo.update(Input.is_action_pressed("launcher_lb"), Input.is_action_pressed("launcher_rb"), delta):
 			_toggle_dev()
@@ -704,6 +759,13 @@ func _update_camera(delta: float) -> void:
 	if launch.active or _dived:
 		_launch_camera()
 		return
+	if intro_playing():
+		var pose := intro.camera_pose(WIDE_POS, WIDE_LOOK)
+		_cam_pos = pose[0]
+		_cam_look = pose[1]
+		camera.fov = 52.0
+		camera.look_at_from_position(_cam_pos, _cam_look)
+		return
 	if not _intro_hold:
 		_intro = minf(_intro + delta / INTRO_SECONDS, 1.0)
 	var centre := Vector3.ZERO
@@ -725,8 +787,8 @@ func _update_camera(delta: float) -> void:
 		back = 8.4
 	var want := Vector3(centre.x * 0.62, height, centre.z + back)
 	var k := smoothstep(0.0, 1.0, _intro)
-	want = Vector3(0, 10.5, 27).lerp(want, k)
-	look = Vector3(0, 1.5, -3).lerp(look, k)
+	want = WIDE_POS.lerp(want, k)
+	look = WIDE_LOOK.lerp(look, k)
 	var ease := 1.0 if delta <= 0.0 or _cam_snap else 1.0 - exp(-delta * 4.5)
 	_cam_snap = false
 	_cam_pos = _cam_pos.lerp(want, ease)
@@ -840,6 +902,8 @@ func _parse_demo(text: String) -> void:
 
 
 func _run_demo() -> void:
+	if intro_playing():
+		return   # the script waits for the intro; its times count from the intro's end
 	if _demo_tour and _demo_goal[Players.P1] < 0 and spots.size() > 1 and not launch.active:
 		_demo_rest -= get_process_delta_time()
 		if _demo_rest <= 0.0:
@@ -848,9 +912,10 @@ func _run_demo() -> void:
 				_demo_tour_dir = -_demo_tour_dir
 			_demo_goal[Players.P1] = at + _demo_tour_dir
 			_demo_rest = DEMO_PAUSE
-	while not _demo.is_empty() and _clock >= float(_demo[0][0]):
+	while not _demo.is_empty() and _clock - _demo_zero >= float(_demo[0][0]):
 		var d: PackedStringArray = _demo.pop_front()
 		match d[1]:
+			"intro": pass   # handled in _ready (wants_intro)
 			"wide": _intro_hold = true
 			"follow": _intro_hold = false
 			"go": _demo_goal[Players.P1] = clampi(int(d[2]), 0, spots.size() - 1)
