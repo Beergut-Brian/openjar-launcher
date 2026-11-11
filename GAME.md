@@ -26,6 +26,8 @@ is no shortcut that runs you to a jar.
 | A | At a jar in focus: jump in and launch it. Anywhere else: a happy cheer |
 | B | Solo: switch save profile (you stay put and become that profile's pick). Two players: a cheer |
 | Select / Back (Tab or `/` on keys) | Change your character in place: poof, the next one pops out, its name over your head. Two players: the other's pick is skipped |
+| Hold LB + RB for 1 s | Toggle showing the `(dev)` builds (their jars wear a dark lid). Every launcher start shows main-branch (stable) games only; the toggle lasts for that run (Kaden 2026-11-10) |
+| Start | Quit to Steam |
 | Hold LB + RB for 1 s | Toggle showing the `(dev)` builds (their jars wear a dark lid) |
 | Start (hold 1.5 s) | Quit to Steam. A badge with an open door shows while held and its ring fills; a tap only ticks |
 
