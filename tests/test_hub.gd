@@ -431,7 +431,9 @@ func test_a_command_jar_launches_and_the_home_hold_brings_you_back() -> void:
 	assert_int(hub.screen).is_equal(hub.Screen.RUNNING)   # not yet
 	await _wait_for_screen(hub, hub.Screen.HUB, 5.0)
 	assert_int(hub.screen).is_equal(hub.Screen.HUB)
-	assert_int(OS.execute("kill", ["-0", browser])).is_not_equal(0)   # the browser went too
+	var st := []   # the browser went too (a zombie has exited; CI's PID 1 may never reap it)
+	var rc := OS.execute("cat", ["/proc/%s/stat" % browser], st)
+	assert_bool(rc != 0 or st.is_empty() or str(st[0]).substr(str(st[0]).rfind(")") + 2).begins_with("Z")).is_true()
 	await _wait(2.0)                                     # Start still down from the hold: no quit
 	Input.action_release("launcher_quit")
 	await _wait(0.1)

@@ -40,7 +40,13 @@ func _read(suffix: String) -> String:
 
 
 func _alive(pid: int) -> bool:
-	return OS.execute("kill", ["-0", str(pid)]) == 0
+	# A zombie has exited already. A container's PID 1 may never reap it, so kill -0 would still
+	# succeed on CI: read the state from /proc instead (field 3 after the "(comm)" name).
+	var out := []
+	if OS.execute("cat", ["/proc/%d/stat" % pid], out) != 0 or out.is_empty():
+		return false
+	var stat := str(out[0])
+	return not stat.substr(stat.rfind(")") + 2).begins_with("Z")
 
 
 func test_the_kiosk_manifest_is_a_command_jar_with_its_own_world() -> void:
