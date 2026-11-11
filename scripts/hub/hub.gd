@@ -772,6 +772,7 @@ func _apply_window_policy(running: bool) -> void:
 	DisplayServer.window_set_mode(mode)
 	if not running:
 		DisplayServer.window_move_to_foreground()
+	print("launcher: %s" % WindowPolicy.report(running, mode, DisplayServer.window_get_mode()))
 
 
 ## The picks on screen, for the game's --p1-char= / --p2-char= (its Roster reads them first).

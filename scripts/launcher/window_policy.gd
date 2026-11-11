@@ -21,3 +21,12 @@ static func restore_mode(saved_mode: int) -> int:
 	if saved_mode < 0 or saved_mode == DisplayServer.WINDOW_MODE_MINIMIZED:
 		return DisplayServer.WINDOW_MODE_FULLSCREEN
 	return saved_mode
+
+
+## One log line after the launcher asked for `asked` and the window is now `got`, so a TV log shows
+## whether the window manager went along with it (S-02 is checked on the TV from this line).
+static func report(running: bool, asked: int, got: int) -> String:
+	var what := "minimise while the game runs" if running else "restore after the game"
+	if asked == got:
+		return "window: %s, done (mode %d)" % [what, got]
+	return "window: %s, asked mode %d, the window manager kept mode %d" % [what, asked, got]
