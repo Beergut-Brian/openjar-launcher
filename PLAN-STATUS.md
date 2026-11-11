@@ -5,7 +5,7 @@ Checked 2026-11-10 on `dev` at `d24c9ee` (branch `docs/plan-status-2`); re-synce
 the plan-status lane against the code, the test run and real frames, not against lane reports.
 
 - **Test run:** `godot --headless --path . -s addons/gdUnit4/bin/GdUnitCmdTool.gd -a tests --ignoreHeadlessMode`
-  exits 0: 117 test cases, 0 failures. Tests are written `tests/<file>.gd::<test>`.
+  exits 0: 117 test cases, 0 failures (gap-close re-run: 138 test cases, 0 failures, `handoff/test-output.txt`). Tests are written `tests/<file>.gd::<test>`.
 - **Frames:** `scripts/tools/shots.sh` (Forward+ on the software GPU), fixtures in `tests/fixtures/hub_*`,
   with user data redirected to `.scratch/xdg` so no real save was touched. They live in
   `.scratch/shots/<run>/` in this worktree, which git ignores. Re-run them with the `HUB_DEMO` line in the Notes.
@@ -36,9 +36,9 @@ Sources (oldest first):
 | ID | Source | Item | Status | Proof | Notes |
 | --- | --- | --- | --- | --- | --- |
 | C-01 | S1 Build 0 | Boots from a single Steam tile, "Open Jar Games" | partial | `project.godot` `config/name`; tags `v0.0.1-dev.2` … `v0.0.2-dev.4`; `~/openjar/QUEUE-2026-11-10.md` "released + booted" | Only the `(dev)` tile runs the launcher. `origin/main` is still `483fa38` (the template rename), so the stable tile has no real launcher build. |
-| C-02 | S1 Build 0, S2 Pitch | Big, loud, fun animated intro: the jar opens, the roster tumbles out, the logo lands with a thump | partial | `scripts/hub/hub.gd` `INTRO_SECONDS` (2.6 s camera glide from the wide shot); frames `boot/t000.4s.png`, `boot/t004.0s.png` | The hub opens with a quiet camera glide over the island. No jar pops open, no characters tumble out, there's no logo, and `intro_thump` is never played. Nothing records a decision to drop the intro. |
+| C-02 | S1 Build 0, S2 Pitch | Big, loud, fun animated intro: the jar opens, the roster tumbles out, the logo lands with a thump | built | `scripts/hub/hub_intro.gd`, `scripts/hub/intro_plan.gd`; `tests/test_intro.gd::test_the_whole_fixture_roster_tumbles_out_lands_and_goes_home`, `::test_skip_ends_it_at_once`, `::test_hub_hides_the_jarlings_during_the_intro_and_a_skips_it`, `::test_intro_plays_on_the_first_boot_of_the_day_only_and_never_in_tests_or_plain_demos`; frames `handoff/frames/intro_01_lid_pops.jpg` … `intro_04_glide_out.jpg`, `intro_strip_every_0.5s.jpg`; `store/clip.mp4` | Gap-close lane, 2026-11-10. A big jar rattles, the lid pops, the roster arcs out and lands in rows, the logo drops with a thump, everyone cheers and hops back in, then the hub's glide. About 8 s for 22 characters, first boot of the day only (`launcher.intro_date`), A skips. The logo is the option A stand-in (`assets/sprites/logo/intro_logo.png`) until V-01. Logged in GAME.md decisions. |
 | C-03 | S1 Build 0, S2 decision | Intro skippable (A) and played only on the first boot of the day | superseded | `hub.gd:18` "input works throughout"; `LauncherState.intro_date` is no longer called from the hub | Superseded by S3: the glide doesn't block input, so there's nothing to skip. If C-02 comes back, this rule comes back with it. |
-| C-04 | S1 Build 0 | Jeff and Chuck appear in the intro; as the roster grows, so does the tumble | partial | `tests/test_hub.gd::test_held_jarlings_are_the_picks_and_jeff_and_chuck_are_residents`, `::test_a_resident_who_is_on_screen_already_is_hidden` | Jeff and Chuck stand on the island as residents. They're hidden while someone plays them, and with the default picks (Jeff + Chuck) both are hidden. The 22-character roster never shows up as a group. |
+| C-04 | S1 Build 0 | Jeff and Chuck appear in the intro; as the roster grows, so does the tumble | built | `HubIntro.cast()` (every roster character with a body, roster order, so Jeff and Chuck first); `tests/test_intro.gd::test_the_whole_fixture_roster_tumbles_out_lands_and_goes_home`, `::test_everyone_gets_their_own_spot_in_front_of_the_jar` (1 to 40), `::test_the_tumble_grows_with_the_roster_but_the_intro_stays_short`; frame `handoff/frames/intro_02_roster_tumbles.jpg` (all 22) | Jeff lands front and centre. The stream speeds up as the roster grows, so the intro stays under 9 s. |
 | C-05 | S1 Build 0 | A horizontal row of game cards, one per installed game | superseded | `tests/test_hub.gd::test_spots_built_from_0_1_2_8_manifests`, `::test_eight_jars_are_sorted_and_each_holds_a_tiny_world`; frame `boot/t000.4s.png` | Superseded by S3: one glass jar per game, in a curved row on the island. |
 | C-06 | S1 Build 0, S2 Art | A looping gameplay clip or animated art on each card | built | `scripts/hub/jar_world.gd`; `tests/test_jar_world.gd::test_every_fallback_kind_builds_a_world_with_no_text`; frame `boot/t004.0s.png` | Each jar holds a slowly turning animated diorama. The manifest's `clip` is parsed (`manifest_scanner.gd`) but never played. That's fine for now. |
 | C-07 | S1 Build 0, S2 Controls | Dev toggle: hold LB + RB for 1 s to show the `(dev)` builds, which wear a dark lid | built | `tests/test_hold_combo.gd::test_fires_once_after_hold_time`, `::test_one_button_never_fires`; `tests/test_manifest_scanner.gd::test_dev_filtering_and_sorted_order`; `hub.gd` `_toggle_dev` (`ui_toggle`); frame `dev/t003.5s.png` | The dev jar's lid is a dark slate with a beacon (middle jar in the frame). It reads blue-grey more than dark. The hold itself needs a pad, so it isn't in a frame. |
@@ -86,18 +86,18 @@ Sources (oldest first):
 | M-08 | S5 | Swap animation and the character's voice on a swap | built | `hub.gd` `change_character` (poof + `CHANGE_SOUND`), catchphrase in M-12 | The swap sound is still the stand-in `intro_pop`. The voice is the catchphrase (M-12). |
 | M-09 | S5 | New characters go straight into the roster | built | `data/roster.json` (22, v0.5.1); `assets/characters/*/`; frames show Astro Ana and Big Tiny | Four characters have no `voice/` folder at all (`assets/characters/{jeff,chuck,bloom,old_reel}`), and Jeff and Chuck are the default picks. |
 | M-10 | S5 decision | Solo, the tag-along friend trades with you; a resident who is on screen already is hidden | built | `tests/test_hub.gd::test_solo_change_trades_with_the_tag_along_and_is_remembered`, `::test_a_resident_who_is_on_screen_already_is_hidden` | |
-| M-11 | S5 decision | The hint ("Select  Change") fades in by your ring after 1.4 s standing still; the name tag shows for 1.5 s after a swap | built | `tests/test_hub.gd::test_the_hint_shows_by_the_ring_when_you_stand_still`; frames `boot/t004.0s.png`, `walk_p2_chooser/t006.8s.png` | It's words, not a glyph (see K-01). With no pad connected it reads "Tab  Change" or "/  Change" (seen again in a fresh frame at `36cc0e9`). |
+| M-11 | S5 decision | The hint ("Select  Change") fades in by your ring after 1.4 s standing still; the name tag shows for 1.5 s after a swap | built | `tests/test_hub.gd::test_the_hint_shows_by_the_ring_when_you_stand_still`; frames `boot/t004.0s.png`, `walk_p2_chooser/t006.8s.png` | The hint is a button picture now (K-01), not words. |
 | M-12 | S6 | The chooser says the character's catchphrase once when it lands | built | `tests/test_chooser_voice.gd` (15 tests, e.g. `::test_fast_steps_say_only_the_last_after_the_settle`, `::test_standing_still_never_repeats`, `::test_p2_joining_says_their_pick_once`); `tests/test_sync_characters.gd::test_vendors_the_catchphrase` | 17 of 21 characters have `voice/catchphrase.ogg`. Jeff, Chuck, Bloom and Old Reel have no voice files, so they say nothing (see M-09). |
 
 ## Audio (A)
 
 | ID | Source | Item | Status | Proof | Notes |
 | --- | --- | --- | --- | --- | --- |
-| A-01 | S2 Audio | Intro sting: jar pop, tumble, logo thump | partial | `assets/audio/sfx/intro_pop.ogg`, `intro_thump.ogg` | The sounds exist, but the hub's opening is silent apart from the music. `intro_thump` is never played. Follows C-02. |
-| A-02 | S2 Audio | Characters bark as they land | partial | `scripts/autoload/Roster.gd` `bark()` | There's no landing (C-02). Characters speak only on a chooser change, a P2 join or a profile swap. |
+| A-01 | S2 Audio | Intro sting: jar pop, tumble, logo thump | built | `hub_intro.gd` `_beat()`: `jar_rattle`, `intro_pop`, a voice or `ui_move` tick per landing, `intro_thump` (the music starts on it), `lid_bonk`, `jar_pop_out`; `tests/test_intro.gd::test_the_whole_fixture_roster_tumbles_out_lands_and_goes_home` | The cues are still the synthesised set in `assets/audio/CUES.md`. |
+| A-02 | S2 Audio | Characters bark as they land | built | `IntroPlan.voice_path()`, `HubIntro._say()`; `tests/test_intro.gd::test_landing_voices_are_happy_barks_and_the_last_says_its_catchphrase`, `::test_landing_voices_never_pile_up` (at most 3 at once) | Vendored barks only (join, cheer, ready, swap_in, win in rotation); the last to land says its catchphrase. Jeff, Chuck, Bloom and Old Reel have no voice yet, so they land with a tick (see M-09). |
 | A-03 | S2 Audio | `ui_move`, `ui_confirm` | built | `tests/test_audio_cues.gd::test_cues_md_lists_the_launcher_cues`, `::test_every_cue_resolves_to_loadable_streams`, `::test_ui_move_has_variants` | |
 | A-04 | S2 Audio | A soft loop under the card row, stopped while a game runs | built | `tests/test_audio_cues.gd::test_card_row_loop_loops_when_played`; `hub.gd` `Audio.music("card_row_loop")` / `stop_music()` | Still the 2D-era loop, 18 s. It loops a lot in a free-roam hub. |
-| A-05 | S3 | One sound per launch beat (rattle, pop, jump, lid, splash, launch) and a pop-out on return | partial | `hub.gd` launch beats; `assets/audio/CUES.md` | Five of the cues are marked "hub lane placeholder" synths. |
+| A-05 | S3 | One sound per launch beat (rattle, pop, jump, lid, splash, launch) and a pop-out on return | built | `hub.gd` `_on_launch_beat()` (six cues), `_play_return()` (`jar_pop_out`, then `lid_bonk` from `GameSpot.drop_lid`), `shout()`; `tests/test_intro.gd::test_the_launcher_shouts_as_it_leaps_and_as_it_pops_back_out`, `::test_bark_path_takes_the_first_bark_the_character_has` | Gap-close: the launching character now also shouts in its own voice on the leap (ready / cheer / join) and on the pop-out (win / join / cheer). Five cues are still marked "hub lane placeholder" synths; restyling them is Audio lane work. |
 
 ## Visuals (V)
 
@@ -108,9 +108,9 @@ Sources (oldest first):
 | V-03 | S2 Camera, Art | 2D flat vector, a fixed 2D UI at 1080p, intro via `AnimationPlayer` | superseded | `scenes/hub/hub.tscn` (3D, Forward+); commit `1d71b82` | Superseded by S3, but GAME.md still describes the 2D launcher (see "Unrecorded"). |
 | V-04 | S2 Lanes | The launcher's theme becomes the `openjar-addons` theme | partial | `scenes/ui/theme.tres` | `addons/openjar/` (the CLAUDE.md submodule) isn't in this repo, and the theme is barely used by the 3D hub. |
 | V-05 | S2 Lanes | Profile faces | superseded | see C-08 | |
-| V-06 | S1 What we were missing | Store art: 600x900 grid, 920x430 hero (and `clip.mp4`) | partial | `store/grid.png` (600x900), `store/hero.png` (920x430), both checked | Both still show the 2D-era logo and stand-ins, not Jar Island. There's no `store/clip.mp4`. |
+| V-06 | S1 What we were missing | Store art: 600x900 grid, 920x430 hero (and `clip.mp4`) | built | `store/grid.png` (600x900), `store/hero.png` (920x430), `store/clip.mp4` (9 s, 1280x720, no audio), all from real intro frames; `assets/CREDITS.md` | Shows Jar Island, the roster and the option A logo stand-in; redo after V-01 (the same shots recipe). The jars hold the test fixture games. |
 | V-07 | S3 | Jar Island at magic hour (`docs/hub-art-direction.md`) | built | frames `boot/t000.4s.png`, `boot/t004.0s.png` | |
-| V-08 | S3 art direction, CLAUDE.md | Green and red belong to the players only | partial | frame `dev/t003.5s.png` | The Smash Party fixture jar's lid comes out bright red (its accent comes from its poster), right next to P2's red. |
+| V-08 | S3 art direction, CLAUDE.md | Green and red belong to the players only | built | `GameSpot.off_players()`; `tests/test_jar_colours.gd::test_red_and_green_jars_are_turned_away_from_the_players`, `::test_a_dead_on_red_goes_pink_and_toy_colours_barely_move`; frame `handoff/frames/v08_smash_party_lid_pink.jpg` | A jar colour within 0.08 (red) or 0.09 (green) hue of a player turns away: dead-on red goes pink, green goes lime. Smash Party's lid is pink now. |
 | V-09 | S2 decisions | Dark costume parts get an inner stone rim; green/red deuteranopia check is advisory | superseded | `art/palettes/checks.py` | The 2D stand-ins went in `1d71b82`. Characters are now the library's 3D models. |
 
 ## Systems (S)
@@ -118,7 +118,7 @@ Sources (oldest first):
 | ID | Source | Item | Status | Proof | Notes |
 | --- | --- | --- | --- | --- | --- |
 | S-01 | S1 What we were missing | The launcher owns the profile and passes `--profile=`; games read it with or without `--` | built | `tests/test_launch_args.gd::test_save_reads_profile_with_or_without_separator`; `tests/test_launcher_state.gd::test_bad_stored_profile_falls_back` | |
-| S-02 | S2 decision | Minimise while a game runs, restore fullscreen on exit | partial | `tests/test_window_policy.gd::test_minimise_on_start_restore_on_exit`, `::test_launcher_default_is_minimise` | GAME.md: "Untested on the TV." |
+| S-02 | S2 decision | Minimise while a game runs, restore fullscreen on exit | partial | `tests/test_window_policy.gd::test_minimise_on_start_restore_on_exit`, `::test_launcher_default_is_minimise`, `::test_the_log_line_says_when_the_window_manager_ignores_us`; real launch on the producer box: `handoff/s02-window-log.txt` | Every launch and return now logs `launcher: window: ...` with the mode it asked for and the mode it got. On the box's bare Xvfb (no window manager) the minimise is ignored ("asked mode 1, the window manager kept mode 0") and the restore works. Still needs one launch on the TV: read that log line. |
 | S-03 | S2 decision | A in the picker holds the happy face for 0.35 s | superseded | see C-08 | |
 | S-04 | S2 decision | Fallback art never repeats on neighbours; a game keeps its own | built | `tests/test_jar_world.gd::test_fallback_kind_is_stable_and_neighbours_differ` | Carried over from cards to jar dioramas. |
 | S-05 | S1 Deploy | `dev` builds show as a separate `(dev)` entry | built | see C-07; `.github/workflows/release.yml` writes `dev=true` for `-dev` tags | |
@@ -127,11 +127,11 @@ Sources (oldest first):
 
 | ID | Source | Item | Status | Proof | Notes |
 | --- | --- | --- | --- | --- | --- |
-| K-01 | S1 checklist, S2 Out of scope | Nothing a kid has to read | partial | frames `boot/t004.0s.png`, `walk_p2_chooser/t006.8s.png` | The "Select  Change" hint and the character name tags are text. Name tags are decoration. The hint teaches with a word: it needs a Select-button glyph. |
-| K-02 | S1 checklist | At most three buttons matter; the rest are harmless | partial | GAME.md Controls; `hub.gd` `quit_to_steam` | Move, A, B, Select, LB+RB and Start all do something. Start leaves the launcher in one press, which a 5-year-old will find. |
+| K-01 | S1 checklist, S2 Out of scope | Nothing a kid has to read | built | `scripts/hub/hint_glyph.gd`; `tests/test_hint_glyph.gd::test_every_kind_draws_and_has_no_words`, `tests/test_hub.gd::test_the_hint_shows_by_the_ring_when_you_stand_still`; frames `handoff/frames/k01_hint_glyphs.png`, `k01_hint_in_hub.jpg` | The chooser hint is a picture: the pad's Select button and swap arrows in the player's colour (a Tab or slash keycap with no pad). The quit badge (K-02) is a picture too. Name tags (1.5 s after a swap) and the logo are decoration, nothing needs reading. |
+| K-02 | S1 checklist | At most three buttons matter; the rest are harmless | built | `hub.gd` `update_quit()`, `scripts/hub/quit_meter.gd`; `tests/test_quit_hold.gd::test_a_tap_on_start_does_not_quit_but_shows_the_badge`, `::test_holding_start_quits`, `::test_start_is_ignored_while_a_game_runs`; frame `handoff/frames/k02_quit_badge_filling.png` | Start must be held 1.5 s (a door badge fills); a tap ticks and nothing happens. Matter: stick, A, Select. B (profile swap, undone by B) and LB+RB (held, hidden) are harmless. Changes the 2026-11-09 one-press decision; logged in GAME.md, Kaden can ask for it back. |
 | K-03 | S1 checklist, CLAUDE.md #7 | A sound and a visual on every input | built | `hub.gd` `Audio.play` on focus, A, B, Select, the head shake, the dev toggle, quit, every launch beat and the return; `tests/test_audio_cues.gd` | |
 | K-04 | S1 checklist | P2 drops in and out with no menu | built | `tests/test_hub.gd::test_second_player_takes_the_other_jarling_and_rings_are_by_player`; `tests/test_chooser_voice.gd::test_p2_joining_says_their_pick_once` | |
-| K-05 | S1 checklist | One camera that never loses a player | partial | `hub.gd` `_update_camera` ("frames the held Jarlings"); frame `walk_p2_chooser/t008.6s.png` | No test or frame has the two players at opposite ends of the island. |
+| K-05 | S1 checklist | One camera that never loses a player | built | `tests/test_camera_two_players.gd::test_two_players_at_opposite_ends_both_stay_in_shot` (edges, diagonals, front edge, both crowded on one side; feet and heads in the frustum); frame `handoff/frames/k05_two_players_opposite_ends.jpg` | |
 | K-06 | S1 checklist | 60 fps at 1080p on the GTX 1060 | missing | none | Frame rates on the software GPU mean nothing. Not measured on the TV. |
 | K-07 | S1 checklist | Cold start to playing in under 10 s | partial | `hub.gd` `_report_cold_start`; the test log printed "interactive" after 2.3 to 10.1 s headless | Not measured on the TV. |
 | K-08 | S1 checklist | P1 green, P2 red everywhere | built | `tests/test_smoke.gd::test_players_colors_are_green_and_red`; frames `walk_p2_chooser/*` | See V-08 for the red jar lid. |
@@ -144,22 +144,21 @@ Sources (oldest first):
 - **The hub replaced the 2D launcher** (S3: `b8205f7`, `1d71b82`, "D42 a") with no entry in GAME.md. The Pitch,
   Core loop ("profile picker → card row"), Camera ("Fixed 2D UI") and Art direction ("2D, flat vector",
   "Cards: 600x900") still describe what was removed. Only the Controls table and the decisions describe the hub.
-- **The intro** (S1: "big, loud, fun animated intro ... the jar opens, the roster ... tumbles out, the logo lands")
-  became a camera glide. Nothing records a decision to drop it.
+- **The intro** was a camera glide with no recorded decision. Resolved 2026-11-10 by the gap-close lane: the intro is
+  built (C-02) and logged in GAME.md decisions.
 - **The logo and palette picks** are still open questions in GAME.md, with no recorded pick.
 
 ## Next up
 
-Ranked by how much Kaden will notice in play. S = an hour or so, M = a lane session, L = several sessions.
+Re-ranked 2026-11-10 by the gap-close lane. S = an hour or so, M = a lane session, L = several sessions.
 
-1. **C-02 / A-01 / A-02 / C-04: a real opening.** The jar pops, the roster tumbles out with barks, the logo lands with a thump. It's the first thing anyone sees, and right now it's a quiet glide. Needs V-01 (logo pick) first. **M**
-2. **M-09: voices for Jeff, Chuck, Bloom and Old Reel.** None of them has a `voice/` folder. Jeff and Chuck are everyone's default picks, so the first characters Kaden sees in the chooser are the silent ones. Library work, then a resync. **M**
-3. **K-02: Start quits the launcher in one press.** A kid will leave the TV by accident. Make it a hold, or ignore it with two players. Needs Kaden's OK because it changes a GAME.md decision. **S**
-4. **C-14 / C-01: `v0.1.0` and a stable tile.** `main` is still the template, so the main "Open Jar Games" tile has no launcher. Playtest the dev build, merge to `main`, tag. **S** (after a playtest)
-5. **K-01 / M-11: swap the "Select  Change" text for a button glyph.** **S**
-6. **A-05 / A-04: real launch cues and a hub music loop.** The cues are placeholder synths, and the 18 s card-row loop plays for the whole free roam. **M**
-7. **V-08: keep jar lids off player red and green.** Clamp poster accents away from `#e4393c` / `#3cc24a`. **S**
-8. **K-06 / K-07 / S-02: measure on the TV.** Frame rate, cold start and the minimise-and-restore. Kaden won't notice unless it fails. **S**
-9. **V-06: store art for Jar Island,** plus a `clip.mp4`. Seen only in the Steam grid. **S**
-10. **V-04: move the theme into `openjar-addons`.** Kaden won't see this. **S**
-11. **K-05: test two players at opposite ends of the island** (frame plus test). **S**
+1. **V-01 / V-02: Kaden picks the logo and the palette.** The intro and the store art use logo option A as a
+   stand-in; after the pick, swap `assets/sprites/logo/intro_logo.png` and re-shoot `store/` (recipe in
+   `handoff/REPORT.md`). **S** once picked.
+2. **M-09: voices for Jeff, Chuck, Bloom and Old Reel.** They land silent in the intro (a tick) and say nothing in
+   the chooser or on a launch. Library work, then a resync. **M**
+3. **C-14 / C-01: `v0.1.0` and a stable tile.** Playtest the dev build (the intro, Start-hold), merge to `main`, tag. **S**
+4. **S-02 / K-06 / K-07: one launch on the TV.** Read the `launcher: window:` line, the F3 frame rate and the
+   cold-start line. **S**
+5. **A-05 / A-04: the Audio lane restyles the five placeholder launch cues and a hub music loop.** **M**
+6. **V-04: move the theme into `openjar-addons`.** Kaden won't see this. **S**
