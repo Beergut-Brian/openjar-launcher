@@ -17,7 +17,7 @@ playable characters, remembers picks and spawns them. API: `docs/contracts.md` "
 ## 1. Vendoring the characters
 
 ```
-scripts/tools/sync_characters.sh ~/openjar/openjar-characters v0.3.0
+scripts/tools/sync_characters.sh ~/openjar/openjar-characters v0.5.0
 ```
 
 For every id in that tag's `characters.json` `roster` (playable characters only; residents such as
@@ -27,14 +27,16 @@ the Mole or the Dragon never appear) it copies into `assets/characters/<id>/`:
 | --- | --- |
 | `<id>.glb` | the 3D master (standard Jarling: `idle`, `run`, `kick`, `cheer`, ten gear slots). Godot extracts `<id>_*.png` textures on import; commit them too |
 | `pixel.png` | the pixel form, front view at native size (40x32), drawn by the library's own sprite code (needs `python3` + Pillow) |
-| `voice/*.ogg` | recorded barks (none yet in `v0.3.0`) |
+| `voice/*.ogg` | recorded barks (the top-level cues only) |
+| `voice/catchphrase.ogg` | the chooser's catchphrase: `voice/lib/catchphrase_big.ogg` only (nothing else from `lib/`, to keep exports small); written as `"catchphrase"` in `data/roster.json` (`""` without one). Not a bark |
 
 and writes `data/roster.json` (roster order, names, defaults, player colours, `res://` paths, the
 tag) and the characters block in `assets/CREDITS.md`. It reads the tag with `git show` (Git LFS
-files are smudged), so the library checkout can be on any branch. Ids that left the roster are
-removed. **New characters: rerun with the new tag, import, commit. No code change.**
+files are smudged), so the library checkout can be on any branch. Each folder it writes gets a
+`.synced` marker; a synced folder whose id left the roster is removed, anything else in
+`assets/characters/` is left alone with a warning. **New characters: rerun with the new tag, import, commit. No code change.**
 
-Current: `v0.3.0`, Jeff (P1 default) and Chuck (P2 default).
+Current: `v0.5.0`, 21 characters, Jeff (P1 default) and Chuck (P2 default); 17 have a catchphrase (not Jeff, Chuck, Bloom, Old Reel).
 
 ## 2. Who each player is
 
@@ -68,6 +70,28 @@ In the lobby, on your podium, before you ready up: left / right (stick, D-pad, k
 character (squash, poof, pop, name bounce, bark or the `char_swap` cue), skipping the other
 player's pick. A readies and locks it, B unlocks. Solo: Select switches which podium the pad
 drives. Details and the per-game notes: `docs/ui.md` "The character chooser", "Per game".
+
+### Chooser voice (launcher)
+
+Kaden, 2026-11-10: "when a character is up on the screen, I'd like it to say its catchphrase
+once. Give a little audio cue of who they are." Same behaviour as the template's lobby
+(`openjar-template` `docs/ui.md` "Chooser voice"), in the hub's in-line chooser (`hub.gd`):
+
+- **Each step** (Select / Tab / `/` that changes the character) plays the swap sound
+  (`CHANGE_SOUND`, `intro_pop`) and the swap animation at once. It no longer barks.
+- **`SAY_SETTLE` = 0.3 s** after the step **has landed**, the character now shown says its
+  catchphrase, **once**, on that player's own voice (`Roster.catchphrase(id, p)`). The launcher's
+  chooser ignores presses mid-swap (0.39 s, longer than the settle), so the settle only counts
+  once the Jarling's swap animation is done; otherwise every step would speak. Pressing again
+  inside the settle restarts it, so fast scrolling says only the one you stop on; standing still
+  says nothing more; every settled step speaks.
+- **P2 joining** and **a profile swap (B)** show a new character: they say it after the same settle.
+- **P2 leaving** and **the launch** cancel a pending line. A head shake (nobody free) says nothing.
+- **The line**: the character's `voice/catchphrase.ogg`; without one a random bark; neither (Jeff,
+  Chuck, Bloom, Old Reel in `v0.5.0`): nothing more, the step's swap sound already sounded.
+- The log says what played when: `Chooser voice: P1 boxbot res://.../catchphrase.ogg (t=5.83 s)`.
+- Tests: `tests/test_chooser_voice.gd` (fixture roster `tests/fixtures/roster_voice.json`, voice
+  files in `tests/voice_fixture/`, outside the `.gdignore`d `tests/fixtures/`).
 
 ## 5. Spawning the pick in game
 
