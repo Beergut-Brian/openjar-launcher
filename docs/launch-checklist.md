@@ -54,9 +54,10 @@ row whose notes say something is rough:
 ## Needs the TV box (the weekend)
 
 - [ ] K-06: F3 on the GTX 1060, 1080p: 60 fps in the hub, the intro (22 characters) and a launch.
-- [ ] K-07: cold start under 10 s: read the `launcher: interactive` line.
+- [ ] K-07: cold start under 10 s: read the `launcher: interactive` line (the box's software GPU gives
+      6.5 to 11.8 s depending on load, most of it first-frame pipeline compiling, so only the TV settles it).
 - [ ] S-02: one launch and return: read the `launcher: window:` lines (minimised while the game runs,
-      fullscreen and in front after).
+      fullscreen and in front after). Already proven under openbox on the box: `docs/evidence/s02-window-log.txt`.
 - [ ] C-14: install Smash Party (`kiosk/smash-party/install.sh`), launch it, play with a pad in the
       browser, quit it with the browser's close and with the 2 s Start hold.
 - [ ] Real pads: P2 drops in with a button, drops out by switching the pad off (the "bye-bye"),
@@ -75,6 +76,7 @@ row whose notes say something is rough:
 - [ ] Voices for Jeff, Chuck, Bloom and Old Reel in `openjar-characters` (cue names the launcher
       uses: `catchphrase`, `cheer`, `join`, `ready`, `swap_in`, `win`), then
       `scripts/tools/sync_characters.sh`. Until then they land and swap silently.
-- [ ] C-01 / C-14: after the weekend playtest, `dev` → `main`, tag `v0.1.0`, boot the stable tile.
+- [x] C-01 / C-14: `dev` → `main`, tag `v0.1.0`, boot the stable tile (done 2026-11-10: v0.1.0, v0.1.1
+      booted; `v0.1.2` tagged at `ae25b42`; gap-close-3 sync).
 - [ ] V-04: move `scenes/ui/theme.tres` into `openjar-addons` (another repo; Kaden never sees it).
 - [ ] A-04 (optional, Audio lane): a longer hub loop; the 18 s loop repeats a lot in free roam.
