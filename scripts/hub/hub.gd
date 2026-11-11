@@ -21,9 +21,10 @@ const WIDE_POS := Vector3(0, 10.5, 27)
 const WIDE_LOOK := Vector3(0, 1.5, -3)
 const SKY_SHADER := preload("res://assets/shaders/hub/sky.gdshader")
 ## Fallback bodies by profile id, only if the Roster has no model for a pick (no data/roster.json).
+## Paths, loaded only when needed: preloading them cost every cold start ~2.4 MB of glTF (K-07).
 const MODELS := {
-	"p1": preload("res://assets/models/jarlings/grownup.glb"),
-	"p2": preload("res://assets/models/jarlings/kid.glb"),
+	"p1": "res://assets/models/jarlings/grownup.glb",
+	"p2": "res://assets/models/jarlings/kid.glb",
 }
 const SIZES := {"p1": 1.15, "p2": 0.86}
 const CHARACTER_SIZE := 1.15      # every Roster character: their own build already sets their height
@@ -102,6 +103,7 @@ var _demo_rest := 0.0
 var _say_in := { Players.P1: -1.0, Players.P2: -1.0 }
 ## The opening (first boot of each day; A skips). null when it is not playing.
 var intro: HubIntro = null
+var _marks: Array = []                   # K-07 cold start: [step, ms since engine start]
 var _demo_zero := 0.0                    # demo times count from here (the end of the intro, if any)
 
 @onready var camera: Camera3D = $Camera
@@ -111,6 +113,7 @@ var _demo_zero := 0.0                    # demo times count from here (the end o
 
 
 func _ready() -> void:
+	_mark("ready")
 	_build_sky_and_lights()
 	HubWorld.build(world)
 	profile = LauncherState.profile(Save)
@@ -125,7 +128,7 @@ func _ready() -> void:
 		var scene := character_scene(pick)
 		var j := HubJarling.new()
 		add_child(j)
-		j.setup(scene if scene else MODELS[id], id, Players.COLOR[jarlings.size()],
+		j.setup(scene if scene else fallback_model(id), id, Players.COLOR[jarlings.size()],
 				CHARACTER_SIZE if scene else SIZES[id])
 		j.character_id = pick if scene else ""
 		jarlings.append(j)
@@ -141,6 +144,7 @@ func _ready() -> void:
 		j.position = r[1]
 		j.rotation.y = atan2(-j.position.x, 6.0)
 		residents.append(j)
+	_mark("characters")
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	_flash = ColorRect.new()   # the launch ends in a flash of the jar's colour
@@ -157,6 +161,7 @@ func _ready() -> void:
 	_apply_roles()
 	apply_characters()
 	_rescan(LauncherState.last_card(Save))
+	_mark("jars")
 	process_watch.wait_time = POLL_SECONDS
 	process_watch.timeout.connect(_on_process_watch)
 	_parse_demo(demo)
@@ -209,11 +214,35 @@ func _on_intro_finished() -> void:
 	_update_residents()
 
 
-## Kid-design target: cold start to playing in under 10 s. Ticks count from engine start.
+## Kid-design target (K-07): cold start to playing in under 10 s. Ticks count from engine start.
+## The hub reads input from its first frame (the intro too: A skips it), so "interactive" is the
+## first frame actually drawn. The marks say where the time went.
 func _report_cold_start() -> void:
-	await get_tree().process_frame
-	print("launcher: interactive (hub, %d jars) after %d ms, unix %.3f" % [
-		spots.size(), Time.get_ticks_msec(), Time.get_unix_time_from_system()])
+	if DisplayServer.get_name() == "headless":
+		await get_tree().process_frame   # nothing is ever drawn headless
+	else:
+		await RenderingServer.frame_post_draw
+	_mark("first frame")
+	print("launcher: interactive (hub, %d jars) after %d ms, unix %.3f (%s)" % [
+		spots.size(), Time.get_ticks_msec(), Time.get_unix_time_from_system(), cold_start_marks()])
+
+
+static func fallback_model(profile_id: String) -> PackedScene:
+	return load(MODELS.get(profile_id, MODELS.p1))
+
+
+func _mark(what: String) -> void:
+	_marks.append([what, Time.get_ticks_msec()])
+
+
+## "ready 900, characters 1200 (+300), ..." : engine start to each step, and the step's own cost.
+func cold_start_marks() -> String:
+	var parts := PackedStringArray()
+	var last := 0
+	for m: Array in _marks:
+		parts.append("%s %d (+%d)" % [m[0], m[1], m[1] - last])
+		last = m[1]
+	return ", ".join(parts)
 
 
 ## Start, held: the badge's ring fills and at QUIT_HOLD s the launcher quits. A tap ticks and lets go.
@@ -547,7 +576,7 @@ func apply_characters(animate: bool = false, always_lead: bool = false) -> void:
 		var scene := character_scene(id)
 		if scene == null:
 			if j.character_id != "":
-				j.set_character("", MODELS[j.profile_id])
+				j.set_character("", fallback_model(j.profile_id))
 			continue
 		if j.character_id == id and not (animate and always_lead and j == lead):
 			continue
