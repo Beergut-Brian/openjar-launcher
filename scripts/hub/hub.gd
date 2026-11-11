@@ -40,6 +40,10 @@ const CHANGE_SOUND := "intro_pop"  # the chooser's swap sound, at once on every 
 ## since presses are ignored mid-swap (0.39 s, longer than the settle). Fast scrolling says only the
 ## one you stop on; standing still says nothing more.
 const SAY_SETTLE := 0.3
+## A-05: the launching character's own voice on top of the beat sounds: a happy bark as it leaps
+## into the jar, another as it pops back out. First one the character has; none: just the beat sound.
+const LEAP_BARKS := ["ready", "cheer", "join"]
+const RETURN_BARKS := ["win", "join", "cheer"]
 const SUN_DIR := Vector3(0.42, 0.2, -1.0)   # the sun you see: low behind the jars, a little to the right
 ## The light itself comes from higher up on the same bearing, so shadows stay short and crisp.
 const LIGHT_DIR := Vector3(0.42, 0.46, -1.0)
@@ -476,6 +480,38 @@ func voice_step(delta: float) -> void:
 				Roster.last_said.get(p, "") if ok else "(no voice)", Time.get_ticks_msec() / 1000.0])
 
 
+## The first of `names` that this Jarling's character has as a voice bark, on its player's voice
+## (a tag-along uses the shared one). The path said, or "" if it has none (the beat sound covers it).
+func shout(j: HubJarling, names: Array) -> String:
+	var path := bark_path(Roster.info(j.character_id), names)
+	if path == "":
+		return ""
+	var player := -1
+	if j == lead_jarling():
+		player = Players.P1
+	elif two_players:
+		player = Players.P2
+	var v := Roster.voice_player(player)
+	if v == null:
+		return ""
+	v.stop()
+	v.stream = load(path)
+	v.play()
+	return path
+
+
+static func bark_path(info: Dictionary, names: Array) -> String:
+	var voice: String = info.get("voice", "")
+	var barks: Array = info.get("barks", [])
+	if voice == "":
+		return ""
+	for b: String in names:
+		var path := "%s%s.ogg" % [voice, b]
+		if barks.has(b) and ResourceLoader.exists(path):
+			return path
+	return ""
+
+
 ## A Roster character's model, or null if it has none (the hub then keeps the fallback body).
 func character_scene(id: String) -> PackedScene:
 	var who := Roster.info(id)
@@ -621,6 +657,7 @@ func _on_launch_beat(beat: int) -> void:
 		LaunchSequence.Beat.LEAP:
 			Audio.play("jarling_jump")
 			j.set_expression("happy")
+			shout(j, LEAP_BARKS)   # "here I go!" in the character's own voice
 		LaunchSequence.Beat.LID_LAND:
 			Audio.play("lid_land")
 			if _lid_lands_on(friend):
@@ -696,6 +733,7 @@ func _play_return(j: HubJarling) -> void:
 	if f >= 0:
 		var spot := spots[f]
 		Audio.play("jar_pop_out")
+		shout(j, RETURN_BARKS)   # "I'm back!"
 		spot.splash()
 		spot.drop_lid(0.5)
 		j.jump_out(spot.mouth_position(), spot.stand_point if j == lead_jarling() else _launch_from)

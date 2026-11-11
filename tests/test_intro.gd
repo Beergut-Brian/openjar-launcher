@@ -181,3 +181,39 @@ func test_hub_hides_the_jarlings_during_the_intro_and_a_skips_it() -> void:
 	for j in hub.jarlings:
 		assert_bool(j.visible).is_true()
 	assert_int(hub.launch.active as int).is_equal(0)   # the A that skipped never launches a game
+
+
+# ---------------------------------------------------------------- A-05: launch and return voices
+
+func _voice_hub() -> Node3D:
+	Roster.data_path = VOICE
+	Roster.reload()
+	OS.set_environment("OPENJAR_ROOT", ProjectSettings.globalize_path("res://tests/fixtures/hub_2"))
+	var hub: Node3D = auto_free(load(HUB).instantiate())
+	add_child(hub)
+	await get_tree().process_frame
+	return hub
+
+
+func test_bark_path_takes_the_first_bark_the_character_has() -> void:
+	Roster.data_path = VOICE
+	Roster.reload()
+	var Hub := load("res://scripts/hub/hub.gd")
+	assert_str(Hub.bark_path(Roster.info("ana"), ["ready", "cheer"])).is_equal("res://tests/voice_fixture/cheer.ogg")
+	assert_str(Hub.bark_path(Roster.info("ana"), ["ready", "win"])).is_empty()
+	assert_str(Hub.bark_path(Roster.info("dee"), ["cheer"])).is_empty()
+
+
+func test_the_launcher_shouts_as_it_leaps_and_as_it_pops_back_out() -> void:
+	var hub: Node3D = await _voice_hub()
+	var lead: HubJarling = hub.lead_jarling()
+	assert_str(lead.character_id).is_equal("ana")
+	hub._launcher_index = hub.jarlings.find(lead)
+	hub._on_launch_beat(LaunchSequence.Beat.LEAP)
+	var v := Roster.voice_player(Players.P1)
+	assert_bool(v.playing).is_true()
+	assert_str(v.stream.resource_path).is_equal("res://tests/voice_fixture/cheer.ogg")
+	v.stop()
+	hub._play_return(lead)
+	assert_bool(v.playing).is_true()   # "I'm back!" with the pop-out
+	v.stop()
