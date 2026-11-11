@@ -14,6 +14,8 @@ One line per file. Nothing enters `assets/` without a line here.
 | `assets/audio/sfx/intro_thump.ogg` | `assets/audio/tools/make_cues.py` (procedural synthesis, Python stdlib + ffmpeg libvorbis) | landing thump with boing tail; seeded, regenerate with the script | CC0 (own work, Open Jar Games) |
 | `assets/audio/sfx/launch.ogg` | `assets/audio/tools/make_cues.py` (procedural synthesis, Python stdlib + ffmpeg libvorbis) | noise whoosh + slide whistle + marimba/kazoo ta-da; seeded, regenerate with the script | CC0 (own work, Open Jar Games) |
 | `assets/audio/sfx/player_join.ogg` | `assets/audio/tools/make_cues.py` (procedural synthesis, Python stdlib + ffmpeg libvorbis) | two rising toy blips; seeded, regenerate with the script | CC0 (own work, Open Jar Games) |
+| `assets/audio/sfx/player_leave.ogg` | `assets/audio/tools/make_cues.py` (procedural synthesis, Python stdlib + ffmpeg libvorbis) | two falling toy blips ("bye-bye"); seeded, regenerate with the script | CC0 (own work, Open Jar Games) |
+| `assets/audio/sfx/chooser_swap.ogg` | `assets/audio/tools/make_cues.py` (procedural synthesis, Python stdlib + ffmpeg libvorbis) | smoke puff, a quick pop and a bell ding; seeded, regenerate with the script | CC0 (own work, Open Jar Games) |
 | `assets/audio/sfx/round_start.ogg` | `assets/audio/tools/make_cues.py` (procedural synthesis, Python stdlib + ffmpeg libvorbis) | marimba arpeggio + xylophone/kazoo hit; seeded, regenerate with the script | CC0 (own work, Open Jar Games) |
 | `assets/audio/sfx/round_end.ogg` | `assets/audio/tools/make_cues.py` (procedural synthesis, Python stdlib + ffmpeg libvorbis) | kazoo + marimba ta-da; seeded, regenerate with the script | CC0 (own work, Open Jar Games) |
 | `assets/audio/sfx/pause.ogg` | `assets/audio/tools/make_cues.py` (procedural synthesis, Python stdlib + ffmpeg libvorbis) | muted marimba plink; seeded, regenerate with the script | CC0 (own work, Open Jar Games) |
@@ -43,17 +45,28 @@ One line per file. Nothing enters `assets/` without a line here.
 | `assets/shaders/hub/cloud_sea.gdshader` | hand-written Godot shader | scrolling noise cloud sea under the island | Original work, Open Jar Games |
 | `assets/shaders/hub/ground.gdshader` | hand-written Godot shader | island top: grass rings, stone plaza, ring mosaic | Original work, Open Jar Games |
 | `tests/fixtures/hub_*/*/store/grid.png` | Pillow script `tests/fixtures/make_fixtures.py` | test-only 600x900 posters for made-up games (ball, bubbles, comet, dino, jelly, moon, star), flat shapes drawn in code; no generative model | Original work, Open Jar Games |
-| `assets/audio/sfx/jar_rattle.ogg` | `assets/audio/tools/make_cues.py` (procedural synthesis, Python stdlib + ffmpeg libvorbis) | tin ticks speeding up and rising, 0.55 s; hub lane placeholder, seeded, regenerate with the script | CC0 (own work, Open Jar Games) |
-| `assets/audio/sfx/jarling_jump.ogg` | `assets/audio/tools/make_cues.py` (procedural synthesis, Python stdlib + ffmpeg libvorbis) | slide-whistle "hup!" E4 → E6 with a breath of air, 0.4 s; hub lane placeholder, seeded, regenerate with the script | CC0 (own work, Open Jar Games) |
-| `assets/audio/sfx/lid_land.ogg` | `assets/audio/tools/make_cues.py` (procedural synthesis, Python stdlib + ffmpeg libvorbis) | tin "tonk" that wobbles like a spun coin, 0.6 s; hub lane placeholder, seeded, regenerate with the script | CC0 (own work, Open Jar Games) |
-| `assets/audio/sfx/jar_splash.ogg` | `assets/audio/tools/make_cues.py` (procedural synthesis, Python stdlib + ffmpeg libvorbis) | plop + rising glockenspiel run and sparkles, 0.9 s; hub lane placeholder, seeded, regenerate with the script | CC0 (own work, Open Jar Games) |
-| `assets/audio/sfx/jar_pop_out.ogg` | `assets/audio/tools/make_cues.py` (procedural synthesis, Python stdlib + ffmpeg libvorbis) | pop then "boi-oing", 0.5 s; hub lane placeholder, seeded, regenerate with the script | CC0 (own work, Open Jar Games) |
-| `assets/audio/sfx/lid_bonk.ogg` | `assets/audio/tools/make_cues.py` (procedural synthesis, Python stdlib + ffmpeg libvorbis) | round tin BONK with a short boing, 0.7 s; hub lane placeholder, seeded, regenerate with the script | CC0 (own work, Open Jar Games) |
+| `assets/audio/sfx/jar_rattle.ogg` | `assets/audio/tools/make_cues.py` (procedural synthesis, Python stdlib + ffmpeg libvorbis) | tin ticks speeding up and rising, 0.55 s; seeded, regenerate with the script | CC0 (own work, Open Jar Games) |
+| `assets/audio/sfx/jarling_jump.ogg` | `assets/audio/tools/make_cues.py` (procedural synthesis, Python stdlib + ffmpeg libvorbis) | slide-whistle "hup!" E4 → E6 with a breath of air, 0.4 s; seeded, regenerate with the script | CC0 (own work, Open Jar Games) |
+| `assets/audio/sfx/lid_land.ogg` | `assets/audio/tools/make_cues.py` (procedural synthesis, Python stdlib + ffmpeg libvorbis) | tin "tonk" that wobbles like a spun coin, 0.6 s; seeded, regenerate with the script | CC0 (own work, Open Jar Games) |
+| `assets/audio/sfx/jar_splash.ogg` | `assets/audio/tools/make_cues.py` (procedural synthesis, Python stdlib + ffmpeg libvorbis) | plop + rising glockenspiel run and sparkles, 0.9 s; seeded, regenerate with the script | CC0 (own work, Open Jar Games) |
+| `assets/audio/sfx/jar_pop_out.ogg` | `assets/audio/tools/make_cues.py` (procedural synthesis, Python stdlib + ffmpeg libvorbis) | pop then "boi-oing", 0.5 s; seeded, regenerate with the script | CC0 (own work, Open Jar Games) |
+| `assets/audio/sfx/lid_bonk.ogg` | `assets/audio/tools/make_cues.py` (procedural synthesis, Python stdlib + ffmpeg libvorbis) | round tin BONK with a short boing, 0.7 s; seeded, regenerate with the script | CC0 (own work, Open Jar Games) |
 | `assets/models/jarlings/grownup.glb` | `openjar-characters` avatar kit (`avatar/kit/build_jarling.py`, Blender 5.2), parameters in `art/jarlings/grownup.json` | generic grown-up Jarling for profile `p1`: blue cap, white tee; not a named or player-locked character | Original work, Open Jar Games |
 | `assets/models/jarlings/kid.glb` | `openjar-characters` avatar kit (`avatar/kit/build_jarling.py`, Blender 5.2), parameters in `art/jarlings/kid.json` | generic kid-sized Jarling for profile `p2`: yellow bobble hat, purple tee; not a named or player-locked character | Original work, Open Jar Games |
 | `assets/models/jarlings/grownup_grownup_face.png`, `kid_kid_face.png` | written by Godot's glTF importer from the two `.glb` files above | embedded face atlases, unchanged | Original work, Open Jar Games |
 | `scripts/hub/jar_world.gd` (generated jar dioramas) | hand-written GDScript, Godot primitive meshes | the "tiny world in every jar" idea and the eight diorama recipes (meadow, space, ocean, volcano, forest, castle, snow, candy) are ported from the other hub entry, branch `feature/hub-opus` (`scripts/hub/game_jar.gd`, `hub_mesh.gd`, `hub_look.gd`), restyled to this island's palette and lighting | Original work, Open Jar Games |
 | `tests/fixtures/hub_8/moon-golf/store/jar.tscn` | hand-written Godot scene, primitive meshes only | test-only example of a game-supplied jar world: moon, craters, flag, ball, orbiting ringed planet | Original work, Open Jar Games |
+
+
+## Character voices (ElevenLabs)
+
+Every `characters/*/voice/*.ogg` in the block below (barks and catchphrases; 17 of the 21 playable
+characters, the four without a `voice/` folder say nothing) was generated with **ElevenLabs** voice
+design and text-to-speech for the `openjar-characters` library (sources and the voice log in the
+producer's `audio-src/voices/`; the voice log records one voice per character made from a voice-design
+preview, not a cloned voice), then trimmed and encoded to Ogg Vorbis there and vendored here
+unchanged by `scripts/tools/sync_characters.sh`. Licence: ElevenLabs paid plan with commercial
+rights; Kaden confirmed on 2026-11-10 that his plan covers these files for release.
 
 <!-- characters:begin (scripts/tools/sync_characters.sh writes this block) -->
 

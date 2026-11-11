@@ -56,6 +56,9 @@ jobs:
       - name: Export Linux
         run: |
           mkdir -p build
+          # the hub's corner label (and the log) show the release tag: stamp it into config/version
+          sed -i "s|^config/version=.*|config/version=\"${GITHUB_REF_NAME#v}\"|" project.godot
+          grep -m1 '^config/version=' project.godot
           godot --headless --path . --import || true
           godot --headless --path . --export-release "Linux" build/game.x86_64
       - name: Write launcher manifest

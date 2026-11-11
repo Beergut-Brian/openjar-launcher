@@ -17,14 +17,16 @@ the script header). Loudness: SFX -16 LUFS (short cues measured while sounding; 
 | intro_thump | sfx/intro_thump.ogg | launcher intro: logo lands | cartoon landing THUMP with a wobbly boing tail, 1.3 s |
 | launch | sfx/launch.ogg | launcher: the camera dives into the jar, game starting | whoosh + slide whistle up, then marimba/kazoo ta-DA, 1.15 s |
 | player_join | sfx/player_join.ogg | P2 drops in | two rising toy blips, "here I am!", 230 ms |
+| player_leave | sfx/player_leave.ogg | launcher: P2's pad goes away, their Jarling hops and tags along again | two falling toy blips, "bye-bye", 260 ms |
+| chooser_swap | sfx/chooser_swap.ogg | launcher: Select changes your character (poof, the next one pops out) | soft smoke puff, a quick E5 → E6 pop and a G6 ding, 400 ms |
 | round_start | sfx/round_start.ogg | Game.start_round | marimba G-C-E "ready, set", xylophone + kazoo "go!", 0.9 s |
 | round_end | sfx/round_end.ogg | Game.end_round | kazoo + marimba ta-DA with sparkle, 0.95 s |
-| jar_rattle | sfx/jar_rattle.ogg | launcher: A at a jar, the lid rattles before it pops (hub lane placeholder) | tin ticks speeding up and rising, 0.55 s |
-| jarling_jump | sfx/jarling_jump.ogg | launcher: the Jarling leaps at the jar (hub lane placeholder) | slide-whistle "hup!" E4 → E6 with a breath of air, 0.4 s |
-| lid_land | sfx/lid_land.ogg | launcher: the flown-off lid lands (on the other Jarling's head) (hub lane placeholder) | tin "tonk" that wobbles like a spun coin, 0.6 s |
-| jar_splash | sfx/jar_splash.ogg | launcher: the Jarling lands inside the jar (hub lane placeholder) | plop + rising glockenspiel run and sparkles, 0.9 s |
-| jar_pop_out | sfx/jar_pop_out.ogg | launcher: back from a game, the Jarling pops out of the jar (hub lane placeholder) | pop then "boi-oing", 0.5 s |
-| lid_bonk | sfx/lid_bonk.ogg | launcher: the lid drops back on the jar (hub lane placeholder) | round tin BONK with a short boing, 0.7 s |
+| jar_rattle | sfx/jar_rattle.ogg | launcher: A at a jar, the lid rattles before it pops | tin ticks speeding up and rising, 0.55 s |
+| jarling_jump | sfx/jarling_jump.ogg | launcher: the Jarling leaps at the jar | slide-whistle "hup!" E4 → E6 with a breath of air, 0.4 s |
+| lid_land | sfx/lid_land.ogg | launcher: the flown-off lid lands (on the other Jarling's head) | tin "tonk" that wobbles like a spun coin, 0.6 s |
+| jar_splash | sfx/jar_splash.ogg | launcher: the Jarling lands inside the jar | plop + rising glockenspiel run and sparkles, 0.9 s |
+| jar_pop_out | sfx/jar_pop_out.ogg | launcher: back from a game, the Jarling pops out of the jar | pop then "boi-oing", 0.5 s |
+| lid_bonk | sfx/lid_bonk.ogg | launcher: the lid drops back on the jar | round tin BONK with a short boing, 0.7 s |
 | pause | sfx/pause.ogg | pause / resume | soft muted marimba plink, 140 ms |
 
 ## Music: `Audio.music("<track>")`, files in `assets/audio/music/`

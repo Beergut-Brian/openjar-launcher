@@ -1,50 +1,57 @@
-# Open Jar Games — game template
+# Open Jar Games (the launcher)
 
-Starter repo for every Open Jar Games title: small, loud, two-player couch games built in
-Godot 4 by a producer agent (Hermes) and parallel agent lanes, played on the family TV box.
+The front door to every Open Jar game on the living-room TV. One Steam tile, "Open Jar Games",
+opens on Jar Island: a floating island at magic hour with one giant glass jar per installed game,
+each holding a tiny animated world. You walk your character up to a jar and jump in; when the game
+quits, you pop back out of the same jar.
 
-**Start here:** `CLAUDE.md` (rules for agents) → `GAME.md` (this game's design doc) →
-`docs/lanes/<your lane>.md`.
+Built in Godot 4 (`.godot-version`) by Hermes and the agent lanes. Design doc: `GAME.md`. What's
+built and verified: `PLAN-STATUS.md` and `docs/launch-checklist.md`.
 
-## New game
+## Play
 
-1. "Use this template" → `Beergut-Brian/<game-slug>`, then create a `dev` branch and add the
-   `openjar-game` topic.
-2. `scripts/tools/rename_project.sh "<Game Name>" <game-slug>`
-3. Design sprint with Kaden → fill `GAME.md` and `docs/art-direction.md`.
-4. Systems lane builds the grey-box on `dev`, tags `v0.0.1-dev.1`.
-5. All lanes go parallel. Reviewer merges to `dev`; Hermes promotes `dev` → `main` after a playtest.
+Either pad drives it; the first pad is player 1 (green ring), a second pad drops in as player 2
+(red ring) by pressing a button, and drops out by going away (unplugged or asleep).
 
-## What is in the box
-
-| Path | Purpose |
+| Input | Does |
 | --- | --- |
-| `CLAUDE.md` | Agent guardrails: Godot 4 syntax, lanes, branches, tests, sound-on-every-action |
-| `GAME.md` | Design-doc template; Hermes owns it |
-| `docs/lanes/` | One file per agent lane: owns / never touches / hand-off / done |
-| `docs/contracts.md` | Shared signals and autoload APIs lanes code against |
-| `docs/kid-design.md` | The checklist every gameplay/UI PR must pass |
-| `docs/art-direction.md` | House style + this game's technique and palette |
-| `docs/setup.md` | Godot, docs, gdUnit4, submodule, export templates |
-| `playtests/_TEMPLATE.md` | What Hermes fills from Kaden's voice note |
-| `project.godot` | 1080p, Forward+, input map for P1/P2 (Xbox layout, 0.15 dead zone), autoloads |
-| `scripts/autoload/` | `Players` (join, green/red), `Game` (state machine), `Save`, `Audio`, `Debug` |
-| `scenes/main.tscn` | Boot scene: press any button → spawn → round |
-| `scenes/players/player.tscn` | Placeholder coloured-box player with move/jump/action + squash |
-| `tests/test_smoke.gd` | gdUnit4: scene loads, input map complete, round cycle, save roundtrip |
-| `export_presets.cfg` | Linux x86-64, embedded pck |
-| `.github/workflows/release.yml` | Tests on PR; on `v*` tag, export + zip + GitHub Release (pre-release for `-dev`) |
-| `.gitattributes` | Git LFS for png/glb/ogg/wav/mp4/ttf |
+| Left stick / D-pad / arrow keys | Walk anywhere on the island; all the way over runs |
+| (walk up to a jar) | It comes into focus: a tick, the jar bounces, its lid lifts |
+| A (Space) | At a jar: jump in and play that game. Anywhere else: a happy cheer |
+| B (Shift) | Solo: switch save profile (you become that profile's character). Two players: a cheer |
+| Select / Back (Tab, or `/` for keyboard P2) | Change your character in place; it says its catchphrase |
+| Hold LB + RB for 1 s | Show or hide the `(dev)` builds (their jars wear a charcoal lid), for this run only |
+| Hold Start (Esc) 1.5 s | Quit to Steam. A door badge fills while held; a tap only ticks |
+| Hold Start 2 s while Smash Party runs | Close it and come home (browser games have no quit a kid can reach) |
 
-## Players
+The first boot of each day plays the intro (the roster tumbles out of a big jar); A skips it.
+The build's version (`vX.Y.Z`, the release tag) sits quietly in the bottom-right corner.
 
-P1 is green (`#3cc24a`), P2 is red (`#e4393c`). First pad to press a button is P1.
-Jeff (P1) and Chuck (P2) are player-locked characters from `openjar-characters`.
+## Games it shows
 
-## Run
+Every `~/Games/openjar/<folder>/openjar.json` (or `$OPENJAR_ROOT/<folder>/`), written by each game's
+release workflow. Format: `docs/contracts.md`, "Launcher". A game can ship its own jar world
+(`store/jar.tscn` or `store/jar.glb`); without one it gets a generated diorama with its poster.
+The launcher reads disk only, never the network. Smash Party (a browser game) is installed by
+`kiosk/smash-party/install.sh`; see `docs/smash-party.md`.
+
+## Run, test, export
 
 ```
-godot --path .                                                              # play
-godot --headless --path . -s addons/gdUnit4/bin/GdUnitCmdTool.gd -a tests  # test
-godot --headless --path . --export-release "Linux" build/game.x86_64       # export
+godot --path .                                                                         # run it
+godot --headless --path . -s addons/gdUnit4/bin/GdUnitCmdTool.gd -a tests --ignoreHeadlessMode   # tests
+godot --headless --path . --export-release "Linux" build/game.x86_64                  # export
+OPENJAR_ROOT=$PWD/tests/fixtures/hub_8 godot --path . -- --demo                        # demo tour, fixture jars
+scripts/tools/shots.sh res://scenes/main.tscn 1,3,6 .scratch/shots                     # real frames (HUB_DEMO scripts: hub.gd)
+scripts/tools/soak.sh 1800 .scratch/soak/soak.tsv 10                                   # 30-minute soak with a monitor log
 ```
+
+On a `v*` tag, `.github/workflows/release.yml` tests, stamps the tag into `config/version`, exports,
+writes `build/openjar.json` (`dev: true` for `-dev` tags) and attaches the zip to a GitHub Release.
+
+## Players and colours
+
+Player 1 is always green, player 2 always red; the rings stay with the player, whoever they are.
+Characters come from `openjar-characters` (`data/roster.json`, `assets/characters/`, synced by
+`scripts/tools/sync_characters.sh`); picks are shared with every Open Jar game and remembered per
+profile. Asset credits: `assets/CREDITS.md`.

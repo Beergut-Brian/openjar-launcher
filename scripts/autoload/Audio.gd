@@ -12,6 +12,8 @@ var _pool: Array[AudioStreamPlayer] = []
 var _music: AudioStreamPlayer
 var _warned := {}
 var _cache := {}
+## The last cue play() was asked for (tests check "a sound on every action" with it).
+var last_cue := ""
 
 
 func _ready() -> void:
@@ -43,8 +45,11 @@ func _notification(what: int) -> void:
 
 ## Stop all sound, let the mixer release it, then quit with exit_code. Use instead of get_tree().quit().
 func quit(exit_code: int = 0) -> void:
+	get_tree().paused = true   # nothing (the intro, a launch beat) starts a new sound while we settle
 	release_all()
 	await get_tree().create_timer(QUIT_SETTLE_SECONDS, true, false, true).timeout
+	release_all()              # anything a process-always node started meanwhile
+	await get_tree().process_frame
 	get_tree().quit(exit_code)
 
 
@@ -55,10 +60,23 @@ func release_all() -> void:
 			continue
 		p.stop()
 		p.stream = null
+	# and every other voice in the tree (the intro's crowd, the Roster's chooser voices): quitting
+	# mid-intro used to leave their playbacks alive and leak them at exit
+	if is_inside_tree():
+		_silence(get_tree().root)
 	_cache.clear()
 
 
+func _silence(at: Node) -> void:
+	if at is AudioStreamPlayer or at is AudioStreamPlayer2D or at is AudioStreamPlayer3D:
+		at.stop()
+		at.stream = null
+	for c in at.get_children():
+		_silence(c)
+
+
 func play(cue: String, _position = null) -> void:
+	last_cue = cue
 	var stream := _resolve(SFX_DIR, cue)
 	if stream == null:
 		return
