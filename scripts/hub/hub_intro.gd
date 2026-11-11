@@ -9,8 +9,9 @@ extends Node3D
 
 signal finished
 
-## Stand-in until Kaden picks a wordmark (V-01): art/logo/README.md marks option A "in the game for now".
-const LOGO := preload("res://art/logo/option_a.png")
+## Stand-in until Kaden picks a wordmark (V-01): a copy of art/logo/option_a.png, which art/logo/README.md
+## marks "in the game for now" (art/ is not exported, so the game reads its own copy in assets/).
+const LOGO := preload("res://assets/sprites/logo/intro_logo.png")
 const LOGO_REST := Vector3(0, 6.2, -1.2)   # from IntroPlan.JAR_AT
 const LOGO_DROP := 9.0
 const CHARACTER_SIZE := 1.15
