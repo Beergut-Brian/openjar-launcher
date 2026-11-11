@@ -145,6 +145,14 @@ installed (Smash Party via its kiosk shortcut counts), launches one, comes back.
   swap arrows in the player's colour), not words. With no pad, a Tab or slash keycap.
 - 2026-11-10 (gap-close): the launching character shouts a bark as it leaps into the jar (ready, cheer
   or join) and another when it pops back out (win, join or cheer), on its player's voice.
+- 2026-11-10 (gap-close-2): Smash Party (the browser game) is a jar until its Godot rebuild ships. It
+  opens full screen in a kiosk browser window with a profile of its own (Chromium-family first, then
+  Firefox), never the system browser, so closing the window is the game ending and the hub comes back.
+  Install and details: `docs/smash-party.md`. Its jar holds a toy car looping past a crate stack.
+- 2026-11-10 (gap-close-2): a browser game has no quit a kid can reach, so while one runs, holding
+  Start for 2 s closes it and you come home (a short press is still the game's own pause). Godot
+  games are never closed this way. Start still held when the hub comes back does not start the
+  launcher's own quit hold.
 
 ## Open questions
 - Logo and jar design: Kaden approves the Art lane's three options.
