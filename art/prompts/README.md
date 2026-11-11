@@ -13,6 +13,14 @@ It rebuilds every launcher PNG and SVG, `scenes/ui/theme.tres`, the shader mater
 `"warm_toybox"` and re-run. The fixed colours (player green/red, Jeff/Chuck costume colours) come
 straight from the palette JSON, unchanged.
 
+`scenes/ui/theme.tres` is also the Open Jar house theme: it is copied verbatim into
+`openjar-addons` as `theme/openjar_theme.tres` and comes back vendored at
+`addons/openjar/theme/openjar_theme.tres` (`addons/openjar/VENDORED.md`). One source (this
+generator), one shipped copy (the addon). If you re-run the generator and the theme changes, copy it
+into `openjar-addons`, tag, and re-vendor; until then
+`tests/test_openjar_addon.gd::test_addon_theme_matches_generator_output` stays red. Never hand-edit
+either file.
+
 ## Style rules the code follows
 
 - Flat vector shapes, no gradients inside shapes. Sky = five flat tiers, darkest at the top.
