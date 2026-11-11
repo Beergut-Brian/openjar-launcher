@@ -88,6 +88,7 @@ slot's pick. Player colours stay with the slot (`Players.COLOR`), never the char
 
 ```gdscript
 signal pick_changed(player: int, id: String)
+signal said(player: int, id: String, path: String)   # a voice line started (-1: shared voice)
 
 var data_path := "res://data/roster.json"   # tests point this at a fixture, then reload()
 var picks_path: String                       # the shared file; tests point this at user://
@@ -98,6 +99,7 @@ func has(id: String) -> bool
 func info(id: String) -> Dictionary          # {} if unknown, else:
 	# id, name ("Jeff"), glb ("res://assets/characters/jeff/jeff.glb" or ""),
 	# pixel ("res://assets/characters/jeff/pixel.png" or ""), voice ("res://.../voice/" or ""),
+	# catchphrase ("res://.../voice/catchphrase.ogg" or ""),
 	# barks (Array of file stems in voice/), default_for (1, 2 or 0)
 func default_for(player: int) -> String      # data/roster.json defaults.P1 / .P2
 func pick(player: int) -> String             # never "" while the roster has a character
@@ -106,7 +108,11 @@ func next_free(player: int, dir: int) -> String  # dir +1 / -1 through roster(),
                                                  # other player's pick; pick(player) if none free
 func taken(id: String, by_other_than: int) -> bool
 func reload() -> void                        # re-read roster.json, args, the shared file
-func bark(id: String) -> bool                # plays a random voice bark; false if it has none
+func bark(id: String, player := -1) -> bool  # plays a random voice bark; false if it has none
+func catchphrase(id: String, player := -1) -> bool   # voice/catchphrase.ogg, else a bark; false if neither
+func voice_player(player := -1) -> AudioStreamPlayer # P1 / P2: that slot's own voice (bus VoiceP1 / VoiceP2,
+                                                     # panned -0.3 / +0.3, sends to SFX); -1: the shared one
+var last_said: Dictionary                    # player (or -1) -> the last res:// path that voice started
 ```
 
 **Resolving a slot** at start (`reload()`), first hit that is in `roster()`:
@@ -276,6 +282,10 @@ func selected_entry() -> Dictionary   # entry of the lead Jarling's jar, {} when
 func press_action(player: int) -> void           # A: start the launch sequence / wobble (empty jar) / cheer
 func pick_profile(id: String) -> void            # B in solo play: the other profile and its picks
 func change_character(player: int) -> bool       # the in-line chooser: next Roster character
+func say_soon(player: int) -> void               # chooser voice: catchphrase SAY_SETTLE (0.3 s) after the swap lands
+func cancel_say(player: int) -> void             # drop a pending line (leave, launch)
+func say_pending(player: int) -> bool
+func voice_step(delta: float) -> void            # counts the settles down (from _process)
 func apply_characters(animate := false, always_lead := false) -> void   # dress Jarlings as the picks
 func current_chars() -> Dictionary               # {P1: id, P2: id} for --p1-char / --p2-char
 func join_second_player() -> void                # P2 takes the Jarling player 1 did not pick
