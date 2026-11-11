@@ -21,9 +21,10 @@ const WIDE_POS := Vector3(0, 10.5, 27)
 const WIDE_LOOK := Vector3(0, 1.5, -3)
 const SKY_SHADER := preload("res://assets/shaders/hub/sky.gdshader")
 ## Fallback bodies by profile id, only if the Roster has no model for a pick (no data/roster.json).
+## Paths, loaded only when needed: preloading them cost every cold start ~2.4 MB of glTF (K-07).
 const MODELS := {
-	"p1": preload("res://assets/models/jarlings/grownup.glb"),
-	"p2": preload("res://assets/models/jarlings/kid.glb"),
+	"p1": "res://assets/models/jarlings/grownup.glb",
+	"p2": "res://assets/models/jarlings/kid.glb",
 }
 const SIZES := {"p1": 1.15, "p2": 0.86}
 const CHARACTER_SIZE := 1.15      # every Roster character: their own build already sets their height
@@ -42,6 +43,11 @@ const CHANGE_SOUND := "intro_pop"  # the chooser's swap sound, at once on every 
 const SAY_SETTLE := 0.3
 ## K-02: Start must be held this long to leave the launcher; a tap only ticks and shows the badge.
 const QUIT_HOLD := 1.5
+## C-14: a `command` game (Smash Party in a kiosk browser) has no quit of its own a kid can reach,
+## so while one runs, holding Start this long closes it and you come home. Longer than QUIT_HOLD,
+## so a pause press in the game never does it. Godot games quit themselves and are never stopped.
+const HOME_HOLD := 2.0
+const STOP_GRACE := 3.0           # after asking a game to stop (TERM): kill it if it is still there
 ## A-05: the launching character's own voice on top of the beat sounds: a happy bark as it leaps
 ## into the jar, another as it pops back out. First one the character has; none: just the beat sound.
 const LEAP_BARKS := ["ready", "cheer", "join"]
@@ -78,10 +84,15 @@ var _dived := false                      # the camera is inside the jar (until t
 var _cam_snap := false
 var _flash: ColorRect
 var _window_mode_before_run := -1
+var _window_check := 0                   # bumped on every launch and return (S-02 settle wait)
 var _input_from_ms := 0
 var _dev_combo := HoldCombo.new(1.0)
 var _quit_combo := HoldCombo.new(QUIT_HOLD)
 var _quit_down := false
+var _quit_needs_release := false         # Start still held from the game: let go before it counts
+var _home_combo := HoldCombo.new(HOME_HOLD)
+var _running_command := false            # the running game is a `command` entry (home hold works)
+var _stopping := false
 var _quitting := false
 var _demo_quit_until := 0.0
 var quit_meter: QuitMeter
@@ -102,6 +113,7 @@ var _demo_rest := 0.0
 var _say_in := { Players.P1: -1.0, Players.P2: -1.0 }
 ## The opening (first boot of each day; A skips). null when it is not playing.
 var intro: HubIntro = null
+var _marks: Array = []                   # K-07 cold start: [step, ms since engine start]
 var _demo_zero := 0.0                    # demo times count from here (the end of the intro, if any)
 
 @onready var camera: Camera3D = $Camera
@@ -111,6 +123,7 @@ var _demo_zero := 0.0                    # demo times count from here (the end o
 
 
 func _ready() -> void:
+	_mark("ready")
 	_build_sky_and_lights()
 	HubWorld.build(world)
 	profile = LauncherState.profile(Save)
@@ -125,7 +138,7 @@ func _ready() -> void:
 		var scene := character_scene(pick)
 		var j := HubJarling.new()
 		add_child(j)
-		j.setup(scene if scene else MODELS[id], id, Players.COLOR[jarlings.size()],
+		j.setup(scene if scene else fallback_model(id), id, Players.COLOR[jarlings.size()],
 				CHARACTER_SIZE if scene else SIZES[id])
 		j.character_id = pick if scene else ""
 		jarlings.append(j)
@@ -141,6 +154,7 @@ func _ready() -> void:
 		j.position = r[1]
 		j.rotation.y = atan2(-j.position.x, 6.0)
 		residents.append(j)
+	_mark("characters")
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	_flash = ColorRect.new()   # the launch ends in a flash of the jar's colour
@@ -157,6 +171,7 @@ func _ready() -> void:
 	_apply_roles()
 	apply_characters()
 	_rescan(LauncherState.last_card(Save))
+	_mark("jars")
 	process_watch.wait_time = POLL_SECONDS
 	process_watch.timeout.connect(_on_process_watch)
 	_parse_demo(demo)
@@ -209,17 +224,44 @@ func _on_intro_finished() -> void:
 	_update_residents()
 
 
-## Kid-design target: cold start to playing in under 10 s. Ticks count from engine start.
+## Kid-design target (K-07): cold start to playing in under 10 s. Ticks count from engine start.
+## The hub reads input from its first frame (the intro too: A skips it), so "interactive" is the
+## first frame actually drawn. The marks say where the time went.
 func _report_cold_start() -> void:
-	await get_tree().process_frame
-	print("launcher: interactive (hub, %d jars) after %d ms, unix %.3f" % [
-		spots.size(), Time.get_ticks_msec(), Time.get_unix_time_from_system()])
+	if DisplayServer.get_name() == "headless":
+		await get_tree().process_frame   # nothing is ever drawn headless
+	else:
+		await RenderingServer.frame_post_draw
+	_mark("first frame")
+	print("launcher: interactive (hub, %d jars) after %d ms, unix %.3f (%s)" % [
+		spots.size(), Time.get_ticks_msec(), Time.get_unix_time_from_system(), cold_start_marks()])
+
+
+static func fallback_model(profile_id: String) -> PackedScene:
+	return load(MODELS.get(profile_id, MODELS.p1))
+
+
+func _mark(what: String) -> void:
+	_marks.append([what, Time.get_ticks_msec()])
+
+
+## "ready 900, characters 1200 (+300), ..." : engine start to each step, and the step's own cost.
+func cold_start_marks() -> String:
+	var parts := PackedStringArray()
+	var last := 0
+	for m: Array in _marks:
+		parts.append("%s %d (+%d)" % [m[0], m[1], m[1] - last])
+		last = m[1]
+	return ", ".join(parts)
 
 
 ## Start, held: the badge's ring fills and at QUIT_HOLD s the launcher quits. A tap ticks and lets go.
 ## Ignored while a game runs. True on the frame it quits.
 func update_quit(down: bool, delta: float) -> bool:
 	if screen == Screen.RUNNING or _quitting:
+		down = false
+	if _quit_needs_release:
+		_quit_needs_release = down
 		down = false
 	if down and not _quit_down:
 		Audio.play("ui_move")   # every press sounds, even one that does nothing yet
@@ -229,6 +271,32 @@ func update_quit(down: bool, delta: float) -> bool:
 	if go:
 		quit_to_steam()
 	return go
+
+
+## While a `command` game runs, Start held for HOME_HOLD s closes it (stop_game). True on that frame.
+func update_home(down: bool, delta: float) -> bool:
+	if screen != Screen.RUNNING or not _running_command or _stopping:
+		down = false
+	if _home_combo.update(down, down, delta):
+		stop_game()
+		return true
+	return false
+
+
+## Ask the running game to close (TERM, so its launch script can take its browser down with it),
+## then kill it if it is still there after STOP_GRACE s. The process watch brings the hub back.
+func stop_game() -> void:
+	if _pid <= 0 or _stopping:
+		return
+	_stopping = true
+	Audio.play("ui_back")
+	print("launcher: home hold, stopping %s (pid %d)" % [_running_slug, _pid])
+	var pid := _pid
+	OS.execute("kill", ["-TERM", str(pid)])
+	await get_tree().create_timer(STOP_GRACE).timeout
+	if pid == _pid and OS.is_process_running(pid):
+		push_warning("launcher: %s ignored TERM, killing it" % _running_slug)
+		OS.kill(pid)
 
 
 func quit_to_steam() -> void:
@@ -375,6 +443,7 @@ func _process(delta: float) -> void:
 	_clock += delta
 	_run_demo()
 	update_quit(Input.is_action_pressed("launcher_quit") or _clock < _demo_quit_until, delta)
+	update_home(Input.is_action_pressed("launcher_quit"), delta)
 	voice_step(delta)
 	if intro_playing():
 		for p: int in [Players.P1, Players.P2]:
@@ -547,7 +616,7 @@ func apply_characters(animate: bool = false, always_lead: bool = false) -> void:
 		var scene := character_scene(id)
 		if scene == null:
 			if j.character_id != "":
-				j.set_character("", MODELS[j.profile_id])
+				j.set_character("", fallback_model(j.profile_id))
 			continue
 		if j.character_id == id and not (animate and always_lead and j == lead):
 			continue
@@ -658,6 +727,8 @@ func _launch(spot: GameSpot, j: HubJarling) -> void:
 		other.move_input = Vector2.ZERO
 	if not entry.binary.is_empty():
 		_ensure_executable(entry.binary)
+	elif _launch_cmd.path.begins_with(String(entry.dir).path_join("")):
+		_ensure_executable(_launch_cmd.path)   # a launch script in the game's folder (zips lose the bit)
 
 
 ## One sound per beat, and the things that happen once. Everything else is posed from launch.t.
@@ -720,6 +791,7 @@ func _start_game() -> void:
 		return
 	_pid = pid
 	_running_slug = entry.slug
+	_running_command = not entry.command.is_empty()
 	launched.emit(entry.slug, j.profile_id)
 	_set_screen(Screen.RUNNING)
 
@@ -729,6 +801,8 @@ func _on_process_watch() -> void:
 		return
 	print("launcher: %s exited (code %d)" % [_running_slug, OS.get_process_exit_code(_pid)])
 	_pid = -1
+	_stopping = false
+	_quit_needs_release = true   # Start may still be down (the home hold, a game's own quit)
 	Roster.reload()           # a pick changed inside the game shows up here
 	apply_characters()
 	_rescan(_running_slug)   # pick up games installed or updated meanwhile
@@ -789,7 +863,31 @@ func _apply_window_policy(running: bool) -> void:
 	DisplayServer.window_set_mode(mode)
 	if not running:
 		DisplayServer.window_move_to_foreground()
-	print("launcher: %s" % WindowPolicy.report(running, mode, DisplayServer.window_get_mode()))
+	_window_check += 1
+	_settle_window(running, mode, _window_check)
+
+
+## S-02: the window manager applies the mode some frames later, so wait for it before logging (the
+## TV's log line is the proof), and if a restore has not taken, try once more (via windowed).
+## A newer launch or return (`check` is stale) ends the wait.
+func _settle_window(running: bool, asked: int, check: int) -> void:
+	var start := Time.get_ticks_msec()
+	var retried := false
+	for attempt in 2:
+		for i in WindowPolicy.SETTLE_CHECKS:
+			if DisplayServer.window_get_mode() == asked:
+				break
+			await get_tree().create_timer(WindowPolicy.SETTLE_STEP, true, false, true).timeout
+			if check != _window_check:
+				return
+		if running or DisplayServer.window_get_mode() == asked or attempt == 1:
+			break
+		retried = true
+		for step: int in WindowPolicy.retry_steps(asked):
+			DisplayServer.window_set_mode(step)
+		DisplayServer.window_move_to_foreground()
+	print("launcher: %s" % WindowPolicy.report(running, asked, DisplayServer.window_get_mode(),
+			Time.get_ticks_msec() - start, retried))
 
 
 ## The picks on screen, for the game's --p1-char= / --p2-char= (its Roster reads them first).

@@ -184,7 +184,7 @@ All paths are relative to the manifest's folder.
 ```json
 { "slug": "smash-party", "name": "Smash Party", "version": "v1.2.0",
   "binary": "game.x86_64",
-  "command": ["/usr/bin/chromium", "--kiosk", "http://localhost:8080"],
+  "command": ["smash-party.sh"],
   "args": ["--fullscreen"],
   "grid": "store/grid.png", "hero": "store/hero.png", "clip": "store/clip.mp4",
   "jar": "store/jar.glb",
@@ -247,6 +247,16 @@ file. A pick that is not a plain identifier is left out.
 The argument is passed **without** a `--` separator, so a Godot game must look for it in both
 `OS.get_cmdline_args()` and `OS.get_cmdline_user_args()` (`Save.gd` does). The working directory
 is inherited from the launcher; games must not rely on it.
+
+#### `command` entries: the home hold
+
+A `command` entry is a game the launcher did not build, usually a browser game in a kiosk window
+(Smash Party: `kiosk/smash-party/`, docs/smash-party.md). It has no quit a kid can reach, so while
+one runs, **holding Start for 2 s** (`HOME_HOLD`) makes the launcher send the process `SIGTERM`,
+and `SIGKILL` 3 s later if it is still running. The program must therefore stay in the foreground
+for as long as the game is open (never hand off to another process and return, as `xdg-open`
+does) and, on `SIGTERM`, close everything it started. Start still held when the hub comes back
+does not count towards the quit hold. `binary` (Godot) games are never stopped this way.
 
 While the game runs the launcher hides, ignores input and idles. With `MINIMIZE_WHILE_RUNNING`
 (const in `hub.gd`, default `true`) it also minimises its own window, and restores its

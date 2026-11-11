@@ -28,6 +28,9 @@ jobs:
           mkdir -p addons && cp -r /tmp/gdunit/addons/gdUnit4 addons/
       - name: Import project
         run: godot --headless --path . --import || true
+      - name: Python for the Smash Party kiosk tests
+        # the godot-ci container has no python3; kiosk/smash-party/smash-party.sh needs it to serve the game
+        run: command -v python3 >/dev/null || (apt-get update -qq && apt-get install -y -qq python3)
       - name: Run tests
         run: godot --headless --path . -s addons/gdUnit4/bin/GdUnitCmdTool.gd -a tests --ignoreHeadlessMode --continue
       - name: Headless boot screenshot

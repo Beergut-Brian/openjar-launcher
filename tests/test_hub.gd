@@ -386,6 +386,80 @@ func test_launch_hand_off_return_and_profile_pick() -> void:
 	assert_str(lines[lines.size() - 1]).is_equal("b-game --profile=p2 --p1-char=jeff --p2-char=chuck --from-test")
 
 
+## C-14: a `command` jar (the real Smash Party manifest, a fake browser) launches, and holding Start
+## while it runs closes it and brings you home. Start still held on the way back never quits.
+const QUIT_WAIT := 1.9
+
+
+func test_a_command_jar_launches_and_the_home_hold_brings_you_back() -> void:
+	root = ProjectSettings.globalize_path("user://test_hub_kiosk_%d" % Time.get_ticks_usec())
+	var dir := root.path_join("smash-party")
+	DirAccess.make_dir_recursive_absolute(dir)
+	for f: String in ["openjar.json", "smash-party.sh"]:   # copied, so the script loses its x bit
+		var src := FileAccess.get_file_as_string("res://kiosk/smash-party".path_join(f))
+		var w := FileAccess.open(dir.path_join(f), FileAccess.WRITE)
+		w.store_string(src)
+		w.close()
+	var out := root.path_join("fake")
+	var saved_cache := OS.get_environment("XDG_CACHE_HOME")
+	OS.set_environment("SMASH_PARTY_GAME", ProjectSettings.globalize_path("res://tests/fixtures/smash_party/game"))
+	OS.set_environment("SMASH_PARTY_BROWSER", ProjectSettings.globalize_path("res://tests/fixtures/smash_party/fake_browser.sh"))
+	OS.set_environment("FAKE_BROWSER_OUT", out)
+	OS.set_environment("FAKE_BROWSER_SECONDS", "30")
+	OS.set_environment("XDG_CACHE_HOME", root.path_join("cache"))
+	var hub := await _hub(root)
+	hub.really_quit = false
+	assert_int(hub.spots.size()).is_equal(1)
+	assert_bool(hub.update_home(true, 5.0)).is_false()   # nothing running: Start is the quit hold
+	_walk_to_jar(hub, 0)
+	await _tap("p1_action")
+	await _wait_for_screen(hub, hub.Screen.RUNNING, 4.0)
+	var t := 0.0
+	while not FileAccess.file_exists(out + ".pid") and t < 8.0:
+		await _wait(0.1)
+		t += 0.1
+	assert_str(FileAccess.get_file_as_string(out + ".page")).contains("SMASH-FIXTURE-OK")
+	var browser := FileAccess.get_file_as_string(out + ".pid").strip_edges()
+	assert_bool(hub.update_home(true, 1.0)).is_false()   # a short press is the game's own pause
+	assert_bool(hub.update_home(false, 0.1)).is_false()
+	assert_bool(hub.update_home(true, 1.0)).is_false()
+	assert_bool(hub.update_home(false, 0.1)).is_false()
+	var quits := [0]
+	hub.quitting.connect(func() -> void: quits[0] += 1)
+	Input.action_press("launcher_quit")                  # the real hold, through _process
+	await _wait(1.0)
+	assert_int(hub.screen).is_equal(hub.Screen.RUNNING)   # not yet
+	await _wait_for_screen(hub, hub.Screen.HUB, 5.0)
+	assert_int(hub.screen).is_equal(hub.Screen.HUB)
+	var st := []   # the browser went too (a zombie has exited; CI's PID 1 may never reap it)
+	var rc := OS.execute("cat", ["/proc/%s/stat" % browser], st)
+	assert_bool(rc != 0 or st.is_empty() or str(st[0]).substr(str(st[0]).rfind(")") + 2).begins_with("Z")).is_true()
+	await _wait(2.0)                                     # Start still down from the hold: no quit
+	Input.action_release("launcher_quit")
+	await _wait(0.1)
+	assert_int(quits[0]).is_equal(0)
+	Input.action_press("launcher_quit")                  # a fresh hold still quits
+	await _wait(QUIT_WAIT)
+	Input.action_release("launcher_quit")
+	assert_int(quits[0]).is_equal(1)
+	for v: String in ["SMASH_PARTY_GAME", "SMASH_PARTY_BROWSER", "FAKE_BROWSER_OUT", "FAKE_BROWSER_SECONDS"]:
+		OS.unset_environment(v)
+	if saved_cache.is_empty():
+		OS.unset_environment("XDG_CACHE_HOME")
+	else:
+		OS.set_environment("XDG_CACHE_HOME", saved_cache)
+
+
+func test_the_home_hold_never_stops_a_godot_game() -> void:
+	_fake_games()
+	var hub := await _hub(root)
+	_walk_to_jar(hub, 0)
+	await _tap("p1_action")
+	await _wait_for_screen(hub, hub.Screen.RUNNING, 4.0)
+	assert_bool(hub.update_home(true, 5.0)).is_false()
+	await _wait_for_screen(hub, hub.Screen.HUB, 5.0)
+
+
 func test_picked_jarling_is_remembered() -> void:
 	LauncherState.set_profile(Save, "p2")
 	var hub := await _hub(_fixture(2))
