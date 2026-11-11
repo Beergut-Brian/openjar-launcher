@@ -27,9 +27,8 @@ is no shortcut that runs you to a jar.
 | B | Solo: switch save profile (you stay put and become that profile's pick). Two players: a cheer |
 | Select / Back (Tab or `/` on keys) | Change your character in place: poof, the next one pops out, its name over your head. Two players: the other's pick is skipped |
 | Hold LB + RB for 1 s | Toggle showing the `(dev)` builds (their jars wear a dark lid). Every launcher start shows main-branch (stable) games only; the toggle lasts for that run (Kaden 2026-11-10) |
-| Start | Quit to Steam |
-| Hold LB + RB for 1 s | Toggle showing the `(dev)` builds (their jars wear a dark lid) |
 | Start (hold 1.5 s) | Quit to Steam. A badge with an open door shows while held and its ring fills; a tap only ticks |
+| (P2's pad goes away) | P2 drops out: a "bye-bye" blip, their Jarling hops and tags along again |
 
 ## Core loop
 Intro (skippable after first viewing) → profile picker (remembers last pick, one press to confirm)
@@ -153,6 +152,14 @@ installed (Smash Party via its kiosk shortcut counts), launches one, comes back.
   Start for 2 s closes it and you come home (a short press is still the game's own pause). Godot
   games are never closed this way. Start still held when the hub comes back does not start the
   launcher's own quit hold.
+- 2026-11-10 (launch-ready): when P2's pad goes away their Jarling hops and goes back to tagging along,
+  with its own sound (`player_leave`, two falling blips), so dropping out is never silent. The chooser's
+  swap has its own sound too (`chooser_swap`, a puff and a "ta!"), no longer the jar's `intro_pop`.
+- 2026-11-10 (launch-ready): if the Start hold completes during the launch animation, the launcher quits
+  and the game is never started behind it.
+- 2026-11-10 (launch-ready): the build's version (the release tag, stamped into `config/version` by
+  release.yml) sits small and faint in the bottom-right corner, for grown-ups; local builds say
+  `v0.0.0-local`. The dev builds' lid is charcoal and nearly matte, so it reads dark in the sunset.
 
 ## Open questions
 - Logo and jar design: Kaden approves the Art lane's three options.
