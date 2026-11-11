@@ -27,7 +27,7 @@ is no shortcut that runs you to a jar.
 | B | Solo: switch save profile (you stay put and become that profile's pick). Two players: a cheer |
 | Select / Back (Tab or `/` on keys) | Change your character in place: poof, the next one pops out, its name over your head. Two players: the other's pick is skipped |
 | Hold LB + RB for 1 s | Toggle showing the `(dev)` builds (their jars wear a dark lid) |
-| Start | Quit to Steam |
+| Start (hold 1.5 s) | Quit to Steam. A badge with an open door shows while held and its ring fills; a tap only ticks |
 
 ## Core loop
 Intro (skippable after first viewing) → profile picker (remembers last pick, one press to confirm)
@@ -127,6 +127,22 @@ installed (Smash Party via its kiosk shortcut counts), launches one, comes back.
 - 2026-11-10 (chooser): B (profile swap) keeps you where you stand and re-pops your Jarling as that
   profile's pick. Both profiles start as Jeff + Chuck, so until someone changes one, B looks like a
   pop in place.
+
+- 2026-11-10 (gap-close): Start has to be **held 1.5 s** to quit to Steam (was one press). A
+  five-year-old finds Start fast; a tap now only ticks and shows the door badge, which shrinks away on
+  release. Mashing never adds up (each release starts over). Still ignored while a game runs. Kaden
+  can ask for one-press back. This leaves three buttons that matter (stick, A, Select); B (a profile
+  swap you undo with another B) and LB+RB (hidden, held) are harmless.
+- 2026-11-10 (gap-close): the intro is the roster tumbling out of a big jar: the jar rattles, the lid
+  pops, every playable character arcs out and lands in rows in front of it saying a happy bark (at most
+  three voices at once; the last one says its catchphrase), the logo drops in with a thump, everyone
+  cheers, then they hop back in and the jar poofs away into the hub's camera glide. About 8 s with 22
+  characters; the stream speeds up as the roster grows so it stays under 9 s. First boot of the day
+  only; A skips at any time. The logo is the Art lane's option A stand-in until Kaden picks (V-01).
+- 2026-11-10 (gap-close): the chooser hint is a picture (the pad's small Select button next to round
+  swap arrows in the player's colour), not words. With no pad, a Tab or slash keycap.
+- 2026-11-10 (gap-close): the launching character shouts a bark as it leaps into the jar (ready, cheer
+  or join) and another when it pops back out (win, join or cheer), on its player's voice.
 
 ## Open questions
 - Logo and jar design: Kaden approves the Art lane's three options.

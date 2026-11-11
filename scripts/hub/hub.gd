@@ -2,7 +2,7 @@
 ## Flow: boot → hub (standing at the last game's jar) → A → launch animation (LaunchSequence: lid
 ## spins off, Jarling leaps in, camera dives into the jar's tiny world) → (game runs) → pop back out.
 ## Owns the Save keys (LauncherState), the manifest list and the child process.
-## Start quits to Steam (exit code 0) except while a game runs.
+## Holding Start for QUIT_HOLD s quits to Steam (exit code 0), except while a game runs (K-02).
 extends Node3D
 
 enum Screen { HUB, RUNNING }
@@ -40,6 +40,8 @@ const CHANGE_SOUND := "intro_pop"  # the chooser's swap sound, at once on every 
 ## since presses are ignored mid-swap (0.39 s, longer than the settle). Fast scrolling says only the
 ## one you stop on; standing still says nothing more.
 const SAY_SETTLE := 0.3
+## K-02: Start must be held this long to leave the launcher; a tap only ticks and shows the badge.
+const QUIT_HOLD := 1.5
 ## A-05: the launching character's own voice on top of the beat sounds: a happy bark as it leaps
 ## into the jar, another as it pops back out. First one the character has; none: just the beat sound.
 const LEAP_BARKS := ["ready", "cheer", "join"]
@@ -49,6 +51,7 @@ const SUN_DIR := Vector3(0.42, 0.2, -1.0)   # the sun you see: low behind the ja
 const LIGHT_DIR := Vector3(0.42, 0.46, -1.0)
 
 signal launched(slug: String, profile_id: String)
+signal quitting
 
 var screen: Screen = Screen.HUB
 var root_dir := ""
@@ -77,6 +80,12 @@ var _flash: ColorRect
 var _window_mode_before_run := -1
 var _input_from_ms := 0
 var _dev_combo := HoldCombo.new(1.0)
+var _quit_combo := HoldCombo.new(QUIT_HOLD)
+var _quit_down := false
+var _quitting := false
+var _demo_quit_until := 0.0
+var quit_meter: QuitMeter
+var really_quit := true                  # tests turn this off to see the hold without quitting
 var _intro := 0.0
 var _intro_hold := false
 var _cam_pos := WIDE_POS
@@ -139,6 +148,8 @@ func _ready() -> void:
 	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_flash.color = Color(1, 1, 1, 0)
 	layer.add_child(_flash)
+	quit_meter = QuitMeter.new()
+	layer.add_child(quit_meter)
 	root_dir = ManifestScanner.default_root()
 	two_players = Players.is_active(Players.P2)
 	Players.player_joined.connect(_on_player_joined)
@@ -205,18 +216,28 @@ func _report_cold_start() -> void:
 		spots.size(), Time.get_ticks_msec(), Time.get_unix_time_from_system()])
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if screen == Screen.RUNNING:
-		return
-	if event.is_action_pressed("launcher_quit"):
-		get_viewport().set_input_as_handled()
+## Start, held: the badge's ring fills and at QUIT_HOLD s the launcher quits. A tap ticks and lets go.
+## Ignored while a game runs. True on the frame it quits.
+func update_quit(down: bool, delta: float) -> bool:
+	if screen == Screen.RUNNING or _quitting:
+		down = false
+	if down and not _quit_down:
+		Audio.play("ui_move")   # every press sounds, even one that does nothing yet
+	_quit_down = down
+	var go := _quit_combo.update(down, down, delta)
+	quit_meter.progress = 1.0 if go else _quit_combo.progress()
+	if go:
 		quit_to_steam()
+	return go
 
 
 func quit_to_steam() -> void:
+	_quitting = true
 	Audio.play("ui_back")
 	Save.flush()
-	set_process_unhandled_input(false)
+	quitting.emit()
+	if not really_quit:
+		return   # tests
 	await get_tree().create_timer(0.25).timeout   # let the cue be heard
 	Audio.quit(0)
 
@@ -353,6 +374,7 @@ func pick_profile(id: String) -> void:
 func _process(delta: float) -> void:
 	_clock += delta
 	_run_demo()
+	update_quit(Input.is_action_pressed("launcher_quit") or _clock < _demo_quit_until, delta)
 	voice_step(delta)
 	if intro_playing():
 		for p: int in [Players.P1, Players.P2]:
@@ -956,6 +978,7 @@ func _run_demo() -> void:
 		var d: PackedStringArray = _demo.pop_front()
 		match d[1]:
 			"intro": pass   # handled in _ready (wants_intro)
+			"holdstart": _demo_quit_until = _clock + float(d[2])   # hold Start this long (frames of the badge)
 			"wide": _intro_hold = true
 			"follow": _intro_hold = false
 			"go": _demo_goal[Players.P1] = clampi(int(d[2]), 0, spots.size() - 1)
