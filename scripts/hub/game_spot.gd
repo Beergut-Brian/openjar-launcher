@@ -61,6 +61,7 @@ func setup(e: Dictionary, i: int = 0, kind: int = -1) -> void:
 		art = _load_art(e.get("grid", ""))
 		var slug := String(e.get("slug", ""))
 		accent = accent_from(art) if art != null else TOY_COLORS[absi(slug.hash()) % TOY_COLORS.size()]
+		accent = off_players(accent)   # V-08: green and red belong to the players
 		world = JarWorld.load_custom(e.get("jar", ""))
 		custom_world = world != null
 		if world == null:
@@ -215,6 +216,33 @@ static func _load_art(path: String) -> Texture2D:
 		return null
 	img.generate_mipmaps()
 	return ImageTexture.create_from_image(img)
+
+
+## Green and red belong to the players (P1 green, P2 red): a saturated jar colour whose hue sits within
+## the player's hue gap of either is turned just far enough away (red goes orange or pink, green goes
+## lime or teal), so a jar never looks like it belongs to a player. Greys and pastels pass untouched.
+## The toy mint stays as it is; the toy orange moves a hair further from red.
+const PLAYER_HUE_GAP := 0.08
+const GREEN_HUE_GAP := 0.09
+
+
+static func hue_gap(player: int) -> float:
+	return GREEN_HUE_GAP if player == Players.P1 else PLAYER_HUE_GAP
+
+
+static func off_players(c: Color) -> Color:
+	if c.s < 0.3:
+		return c
+	var h := c.h
+	for p: int in Players.COLOR:
+		var pc: Color = Players.COLOR[p]
+		var gap := hue_gap(p)
+		var d := wrapf(h - pc.h, -0.5, 0.5)
+		if absf(d) < gap:
+			# already leaning off it: keep going that way; dead on: red goes pink, green goes lime
+			var side := signf(d) if absf(d) > gap * 0.5 else -1.0
+			h = wrapf(pc.h + gap * side, 0.0, 1.0)
+	return Color.from_hsv(h, c.s, c.v, c.a)
 
 
 ## The art's average colour, pushed bright and saturated, lights the jar and the ground round it.
