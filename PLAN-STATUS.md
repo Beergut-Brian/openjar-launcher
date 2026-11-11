@@ -1,6 +1,7 @@
 # Plan status: openjar-launcher (Open Jar Games)
 
-Checked 2026-11-10 on `dev` at `d24c9ee` (branch `docs/plan-status-2`). Every row was checked by
+Checked 2026-11-10 on `dev` at `d24c9ee` (branch `docs/plan-status-2`); re-synced the same day at `36cc0e9`
+(roster v0.5.1, 22 characters) by the gap-close lane (`feature/launcher-gap-close-1`). Every row was checked by
 the plan-status lane against the code, the test run and real frames, not against lane reports.
 
 - **Test run:** `godot --headless --path . -s addons/gdUnit4/bin/GdUnitCmdTool.gd -a tests --ignoreHeadlessMode`
@@ -27,6 +28,8 @@ Sources (oldest first):
   It can just be a part of the ready up screen". Also covers the GAME.md "(chooser)" decisions.
 - S6 Kaden chat, 2026-11-10: "when a character is up on the screen, I'd like it to say it's catchphrase once."
 - No playtest reports yet (`playtests/` holds only `_TEMPLATE.md`).
+- Kaden, 2026-11-10: there is no stick-only requirement any more. No row asked for one (P-04 is "walk
+  anywhere", which the D-pad and keys also do), so no row was dropped.
 
 ## Core loop and launching (C)
 
@@ -35,7 +38,7 @@ Sources (oldest first):
 | C-01 | S1 Build 0 | Boots from a single Steam tile, "Open Jar Games" | partial | `project.godot` `config/name`; tags `v0.0.1-dev.2` … `v0.0.2-dev.4`; `~/openjar/QUEUE-2026-11-10.md` "released + booted" | Only the `(dev)` tile runs the launcher. `origin/main` is still `483fa38` (the template rename), so the stable tile has no real launcher build. |
 | C-02 | S1 Build 0, S2 Pitch | Big, loud, fun animated intro: the jar opens, the roster tumbles out, the logo lands with a thump | partial | `scripts/hub/hub.gd` `INTRO_SECONDS` (2.6 s camera glide from the wide shot); frames `boot/t000.4s.png`, `boot/t004.0s.png` | The hub opens with a quiet camera glide over the island. No jar pops open, no characters tumble out, there's no logo, and `intro_thump` is never played. Nothing records a decision to drop the intro. |
 | C-03 | S1 Build 0, S2 decision | Intro skippable (A) and played only on the first boot of the day | superseded | `hub.gd:18` "input works throughout"; `LauncherState.intro_date` is no longer called from the hub | Superseded by S3: the glide doesn't block input, so there's nothing to skip. If C-02 comes back, this rule comes back with it. |
-| C-04 | S1 Build 0 | Jeff and Chuck appear in the intro; as the roster grows, so does the tumble | partial | `tests/test_hub.gd::test_held_jarlings_are_the_picks_and_jeff_and_chuck_are_residents`, `::test_a_resident_who_is_on_screen_already_is_hidden` | Jeff and Chuck stand on the island as residents. They're hidden while someone plays them, and with the default picks (Jeff + Chuck) both are hidden. The 21-character roster never shows up as a group. |
+| C-04 | S1 Build 0 | Jeff and Chuck appear in the intro; as the roster grows, so does the tumble | partial | `tests/test_hub.gd::test_held_jarlings_are_the_picks_and_jeff_and_chuck_are_residents`, `::test_a_resident_who_is_on_screen_already_is_hidden` | Jeff and Chuck stand on the island as residents. They're hidden while someone plays them, and with the default picks (Jeff + Chuck) both are hidden. The 22-character roster never shows up as a group. |
 | C-05 | S1 Build 0 | A horizontal row of game cards, one per installed game | superseded | `tests/test_hub.gd::test_spots_built_from_0_1_2_8_manifests`, `::test_eight_jars_are_sorted_and_each_holds_a_tiny_world`; frame `boot/t000.4s.png` | Superseded by S3: one glass jar per game, in a curved row on the island. |
 | C-06 | S1 Build 0, S2 Art | A looping gameplay clip or animated art on each card | built | `scripts/hub/jar_world.gd`; `tests/test_jar_world.gd::test_every_fallback_kind_builds_a_world_with_no_text`; frame `boot/t004.0s.png` | Each jar holds a slowly turning animated diorama. The manifest's `clip` is parsed (`manifest_scanner.gd`) but never played. That's fine for now. |
 | C-07 | S1 Build 0, S2 Controls | Dev toggle: hold LB + RB for 1 s to show the `(dev)` builds, which wear a dark lid | built | `tests/test_hold_combo.gd::test_fires_once_after_hold_time`, `::test_one_button_never_fires`; `tests/test_manifest_scanner.gd::test_dev_filtering_and_sorted_order`; `hub.gd` `_toggle_dev` (`ui_toggle`); frame `dev/t003.5s.png` | The dev jar's lid is a dark slate with a beacon (middle jar in the frame). It reads blue-grey more than dark. The hold itself needs a pad, so it isn't in a frame. |
@@ -81,9 +84,9 @@ Sources (oldest first):
 | M-06 | S5 | The roster is playable characters only (no Mole, Dragon, ...); unknown ids fall back to the defaults | built | `data/roster.json` (characters v0.5.0, 21 playable ids, defaults Jeff/Chuck); `tests/test_roster.gd::test_unknown_ids_fall_back`, `::test_defaults_when_nothing_else` | |
 | M-07 | S5 | Player colours stay with the slot, not the character | built | `data/roster.json` `player_colours`; frame `walk_p2_chooser/t008.6s.png` (green and red rings under any character) | |
 | M-08 | S5 | Swap animation and the character's voice on a swap | built | `hub.gd` `change_character` (poof + `CHANGE_SOUND`), catchphrase in M-12 | The swap sound is still the stand-in `intro_pop`. The voice is the catchphrase (M-12). |
-| M-09 | S5 | New characters go straight into the roster | built | `data/roster.json` (21); `assets/characters/*/`; frames show Astro Ana and Big Tiny | Four characters have no `voice/` folder at all (`assets/characters/{jeff,chuck,bloom,old_reel}`), and Jeff and Chuck are the default picks. |
+| M-09 | S5 | New characters go straight into the roster | built | `data/roster.json` (22, v0.5.1); `assets/characters/*/`; frames show Astro Ana and Big Tiny | Four characters have no `voice/` folder at all (`assets/characters/{jeff,chuck,bloom,old_reel}`), and Jeff and Chuck are the default picks. |
 | M-10 | S5 decision | Solo, the tag-along friend trades with you; a resident who is on screen already is hidden | built | `tests/test_hub.gd::test_solo_change_trades_with_the_tag_along_and_is_remembered`, `::test_a_resident_who_is_on_screen_already_is_hidden` | |
-| M-11 | S5 decision | The hint ("Select  Change") fades in by your ring after 1.4 s standing still; the name tag shows for 1.5 s after a swap | built | `tests/test_hub.gd::test_the_hint_shows_by_the_ring_when_you_stand_still`; frames `boot/t004.0s.png`, `walk_p2_chooser/t006.8s.png` | It's words, not a glyph (see K-01). With no pad connected it reads "Tab  Change" or "/  Change". |
+| M-11 | S5 decision | The hint ("Select  Change") fades in by your ring after 1.4 s standing still; the name tag shows for 1.5 s after a swap | built | `tests/test_hub.gd::test_the_hint_shows_by_the_ring_when_you_stand_still`; frames `boot/t004.0s.png`, `walk_p2_chooser/t006.8s.png` | It's words, not a glyph (see K-01). With no pad connected it reads "Tab  Change" or "/  Change" (seen again in a fresh frame at `36cc0e9`). |
 | M-12 | S6 | The chooser says the character's catchphrase once when it lands | built | `tests/test_chooser_voice.gd` (15 tests, e.g. `::test_fast_steps_say_only_the_last_after_the_settle`, `::test_standing_still_never_repeats`, `::test_p2_joining_says_their_pick_once`); `tests/test_sync_characters.gd::test_vendors_the_catchphrase` | 17 of 21 characters have `voice/catchphrase.ogg`. Jeff, Chuck, Bloom and Old Reel have no voice files, so they say nothing (see M-09). |
 
 ## Audio (A)
