@@ -39,10 +39,28 @@ func test_round_trip() -> void:
 	var b := _fresh_save()
 	assert_str(LauncherState.last_card(b)).is_equal("kick-off")
 	assert_str(LauncherState.profile(b)).is_equal("p2")
-	assert_bool(LauncherState.show_dev(b)).is_true()
 	assert_str(LauncherState.intro_date(b)).is_equal("2026-11-09")
 	assert_bool(LauncherState.should_play_intro(b, "2026-11-09")).is_false()
 	assert_bool(LauncherState.should_play_intro(b, "2026-11-10")).is_true()
+	b.free()
+
+
+func test_dev_builds_are_hidden_at_every_boot() -> void:
+	# A save from the old launcher that remembered "show dev" must not show them at boot.
+	var a := _fresh_save()
+	a.wipe()
+	a.set_value(LauncherState.SHOW_DEV, true)
+	a.flush()
+	LauncherState.reset_session()
+	assert_bool(LauncherState.show_dev(a)).is_false()
+	# Holding LB + RB turns them on for this run only.
+	LauncherState.set_show_dev(a, true)
+	assert_bool(LauncherState.show_dev(a)).is_true()
+	a.free()
+	# The next boot starts hidden again.
+	LauncherState.reset_session()
+	var b := _fresh_save()
+	assert_bool(LauncherState.show_dev(b)).is_false()
 	b.free()
 
 

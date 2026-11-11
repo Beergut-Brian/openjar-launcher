@@ -27,13 +27,23 @@ static func set_profile(save: Node, id: String) -> void:
 	save.set_value(PROFILE, id)
 
 
-static func show_dev(save: Node) -> bool:
-	var v = save.get_value(SHOW_DEV, false)
-	return v is bool and v
+## Dev builds are shown for this launcher run only (Kaden, 2026-11-10: only main-branch games show;
+## hold LB + RB to see the dev ones). Never restored at boot, so every start shows stable games only.
+## SHOW_DEV stays as a key name so an old save's value is simply ignored.
+static var _show_dev_session := false
 
 
-static func set_show_dev(save: Node, on: bool) -> void:
-	save.set_value(SHOW_DEV, on)
+static func show_dev(_save: Node = null) -> bool:
+	return _show_dev_session
+
+
+static func set_show_dev(_save: Node, on: bool) -> void:
+	_show_dev_session = on
+
+
+## Tests: back to a fresh boot.
+static func reset_session() -> void:
+	_show_dev_session = false
 
 
 static func intro_date(save: Node) -> String:

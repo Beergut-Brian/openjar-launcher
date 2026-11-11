@@ -311,5 +311,5 @@ for `scripts/tools/shots.sh`; see `_run_demo()` in `hub.gd`.
 
 ### Launcher save keys (launcher's own `Save`, default profile)
 
-`launcher.last_card` (slug), `launcher.profile` (`p1`/`p2`), `launcher.show_dev` (bool).
+`launcher.last_card` (slug), `launcher.profile` (`p1`/`p2`), `launcher.show_dev` (bool, no longer read: dev builds are shown for one launcher run only, never restored at boot; Kaden 2026-11-10).
 `launcher.intro_date` is no longer written (the hub has no separate intro).
