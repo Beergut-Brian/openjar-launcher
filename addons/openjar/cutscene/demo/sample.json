@@ -1,0 +1,13 @@
+{"id": "sample", "scene": "demo", "steps": [
+  {"do": "camera", "to": "middle", "dy": -10, "zoom": 3.0, "time": 0.8, "wait": 0.6},
+  {"do": "spawn", "who": "guest", "sheet": "", "at": "left", "dx": -60, "face": 1},
+  {"do": "walk", "who": "guest", "to": "host", "dx": -28, "time": 1.2},
+  {"do": "line", "who": "guest", "line": "sample_hello", "pics": ["face_happy", "star"]},
+  {"do": "hop", "who": "host", "times": 2, "time": 0.6},
+  {"do": "item", "pic": "heart", "from": "host", "to": "guest", "time": 0.7},
+  {"do": "hold", "who": "guest", "pic": "heart"},
+  {"do": "line", "who": "host", "line": "sample_bye_{char}", "pics": ["face_hopeful"], "time": 1.4},
+  {"do": "call", "fn": "mark_seen", "args": {"flag": "sample"}, "always": true},
+  {"do": "camera_back"},
+  {"do": "wait", "time": 0.3}
+]}

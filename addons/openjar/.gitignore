@@ -1,0 +1,6 @@
+.godot/
+*.import
+.scratch/
+tests/project/addons/
+tests/project/reports/
+tests/project/.godot/

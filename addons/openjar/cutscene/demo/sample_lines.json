@@ -1,0 +1,4 @@
+{"lines": [
+  {"id": "sample_hello", "character": "guest", "text": "Hello there!", "delivery": "bright", "fallback": "sfx:ui_confirm"},
+  {"id": "sample_bye_any", "character": "any", "text": "See you soon.", "delivery": "warm", "fallback": "bark:cheer"}
+]}
