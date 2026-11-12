@@ -4,7 +4,27 @@ Launch-readiness lane, 2026-11-10/11. The audit was written before any fix (ever
 fixed or listed below); then what's verified on the producer box, what needs the TV box, what needs
 Kaden and what needs Gary. Row ids are PLAN-STATUS ids.
 
-## Audit (before any fix)
+## Second-pass audit (2026-11-12, `feature/launch-ready-2`, before any fix)
+
+Every PLAN-STATUS row re-checked against `dev` at `52e3ecf` (after gap-close-3, vendor-addons-1,
+vendor-theme-1 and the roster v0.5.3 resync), not against the first pass. `playtests/` still holds only
+`_TEMPLATE.md`, so "the most recent playtest sections" are the newest rows (gap-close-3, V-04, the
+v0.5.3 resync), re-checked in real frames. Baseline: `scripts/tools/test.sh` exits 0, 170 test cases.
+
+| Row | Status before | What's rough or missing on dev now | Plan |
+| --- | --- | --- | --- |
+| M-09 / M-12 / A-02 | built | v0.5.3 gave all 22 characters a `voice/` (8 barks + catchphrase), Jeff, Chuck, Bloom and Old Reel included; the rows (and L-06) still say four are silent, and no test pins the real roster's voices | Test: every real roster character has loadable barks and a catchphrase; check Jeff and Chuck speak in a real session log; fix the notes. |
+| K-11 | built | `assets/CREDITS.md` voice section says "17 of the 21 playable characters, the four without a `voice/` folder say nothing" | Fix the text (22 of 22); test it. |
+| L-06 | built | lists "four silent characters" as a left-over | Update. |
+| (new) test noise | — | 13 engine `ERROR: Parameter "material" is null` lines in the gdUnit4 run (dummy renderer, every test that swaps a character); the headless soak with the real roster has none | Find the cause; fix if it's ours. |
+| GAME.md | — | the chooser decision still says "Stand-in sound `intro_pop` until characters have recorded barks" (superseded by the launch-ready swap cue and the v0.5.3 voices) | Hermes's file: listed, not edited. |
+| V-01 / V-02 | partial | no logo / palette pick | Needs Kaden. |
+| V-06 | built | store art carries the option A logo stand-in | Re-shoot after V-01 (Kaden). |
+| K-06 / K-07 | missing / partial | 60 fps and cold start on the GTX 1060 | Needs the TV box. |
+| A-04 | built | 18 s loop repeats in free roam | Audio-lane option, not a gap; listed. |
+| everything else | built / superseded | re-checked: tests, real frames of the full session, soak, export | Re-verify, no change expected. |
+
+## First-pass audit (2026-11-10, before any fix)
 
 `playtests/` holds only `_TEMPLATE.md`: there is no playtest report yet, so "the most recent
 playtest sections" are the newest PLAN-STATUS rows (gap-close-1 and -2), re-checked in real frames
@@ -33,6 +53,17 @@ row whose notes say something is rough:
 | (new) version | — | no version anywhere; `config/version` is the template's `0.0.1` | Fix: release.yml stamps the tag; a quiet corner label; the boot log line. |
 | (new) README | — | still the template's README | Fix: launcher README with play instructions. |
 | (new) GAME.md Controls | — | two stale rows (one-press Start, a second LB+RB row) contradict the gap-close decisions | Fix the two rows; the stale 2D Pitch/Core loop/Camera/Art sections stay listed for Hermes. |
+
+## Verified on the producer box (2026-11-12, `feature/launch-ready-2`)
+
+- **Tests:** 175 test cases, 0 failures, 0 engine errors (`handoff/test-output.txt`), including the new
+  `tests/test_real_roster_voices.gd` (all 22 characters speak) and `tests/test_jarling_swap_clean.gd`.
+- **Session flow in real frames** (`handoff/frames/lr2_*`): intro, quit mid-intro, chooser with two players,
+  P2 drop-out, profile swap, launch and return, quit from the hub; every run exit 0, 0 errors.
+- **Soak:** 30 min headless (0 errors, 0 orphans, flat counts after a 2 min warm-up) and 30 min rendered
+  (frame time); numbers in `handoff/REPORT.md`.
+- **Export:** stamped, exported, zipped, unzipped, booted: launch, return, chooser, P2 in/out, Start-hold
+  quit, exit 0, 0 errors; no personal info in the pack.
 
 ## Verified on the producer box (2026-11-10/11, `feature/launch-ready-1`)
 
@@ -73,10 +104,9 @@ row whose notes say something is rough:
 
 ## Needs Gary
 
-- [ ] Voices for Jeff, Chuck, Bloom and Old Reel in `openjar-characters` (cue names the launcher
-      uses: `catchphrase`, `cheer`, `join`, `ready`, `swap_in`, `win`), then
-      `scripts/tools/sync_characters.sh`. Until then they land and swap silently.
+- [x] Voices for Jeff, Chuck, Bloom and Old Reel (done: `openjar-characters` v0.5.3, resynced 2026-11-11;
+      all 22 speak, pinned by `tests/test_real_roster_voices.gd`).
 - [x] C-01 / C-14: `dev` → `main`, tag `v0.1.0`, boot the stable tile (done 2026-11-10: v0.1.0, v0.1.1
       booted; `v0.1.2` tagged at `ae25b42`; gap-close-3 sync).
-- [ ] V-04: move `scenes/ui/theme.tres` into `openjar-addons` (another repo; Kaden never sees it).
+- [x] V-04: the theme ships from `openjar-addons` v0.2.1 (vendor-theme-1).
 - [ ] A-04 (optional, Audio lane): a longer hub loop; the 18 s loop repeats a lot in free roam.

@@ -60,8 +60,8 @@ One line per file. Nothing enters `assets/` without a line here.
 
 ## Character voices (ElevenLabs)
 
-Every `characters/*/voice/*.ogg` in the block below (barks and catchphrases; 17 of the 21 playable
-characters, the four without a `voice/` folder say nothing) was generated with **ElevenLabs** voice
+Every `characters/*/voice/*.ogg` in the block below (barks and catchphrases; all 22 playable
+characters have one since `openjar-characters` v0.5.3) was generated with **ElevenLabs** voice
 design and text-to-speech for the `openjar-characters` library (sources and the voice log in the
 producer's `audio-src/voices/`; the voice log records one voice per character made from a voice-design
 preview, not a cloned voice), then trimmed and encoded to Ogg Vorbis there and vendored here
