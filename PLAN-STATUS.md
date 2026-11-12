@@ -18,6 +18,10 @@ the plan-status lane against the code, the test run and real frames, not against
 - **Totals** (gap-close-3 recount, 2026-11-11): 79 rows: 63 built, 11 superseded, 4 partial, 1 missing. Every row
   left open needs the TV box (K-06 missing, K-07 partial: weekend TV check), Kaden's pick (V-01, V-02) or
   another repo (V-04: the addon is vendored, but its v0.2.0 tag has no theme yet; closed by vendor-theme-1 below).
+- **Launch-ready-2** (`feature/launch-ready-2`, 2026-11-12): every row re-audited against `dev` at `52e3ecf`;
+  M-09 closed by the v0.5.3 voices (pinned by a test), K-11 / L-06 text fixed, L-07 added (the swap's engine
+  error); test run 175 test cases, 0 failures, 0 engine errors. **Totals (recount):** 80 rows: 65 built,
+  11 superseded, 3 partial (V-01, V-02: Kaden's pick; K-07: TV box), 1 missing (K-06: TV box).
 - **Vendor-addons-1** (`feature/launcher-vendor-addons-1`, 2026-11-11): `openjar-addons` v0.2.0 vendored at
   `addons/openjar/`; V-04 stays partial (reason in the row). Recount: totals unchanged, 79 rows: 63 built, 11 superseded,
   4 partial, 1 missing. `scripts/tools/test.sh` exits 0: 169 test cases, 0 failures (`handoff/test-output.txt`).
@@ -163,6 +167,7 @@ Sources (oldest first):
 | L-04 | Launch brief | No personal info in the shipped build; exported zip boots clean | built | `export_presets.cfg` (design docs, store art and kiosk files stay out of the pack; scripts ship as binary tokens, so comments do not ship); exported, zipped like release.yml, unzipped and booted: launch, return, quit, exit 0, no errors | |
 | L-05 | Launch brief | README play instructions current | built | `README.md` | Was the template's README. |
 | L-06 | Launch brief | No placeholders in shipped scenes | built | grep in `handoff/REPORT.md` section 4 | Left, by design or for someone else: the logo stand-in (V-01), four silent characters (M-09), `scenes/players/player.tscn` (template file, unused, now kept out of the export). Launch-ready-2, 2026-11-12: the four silent characters are gone from this list (v0.5.3 voices); left: the logo stand-in (V-01) and the unused template player scene. |
+| L-07 | Launch brief (zero script errors) | The test run and a headless session log no engine errors | built | `scripts/hub/jarling.gd` `_set_model` (drops the rim-light override materials before freeing the old body); `tests/test_jarling_swap_clean.gd::test_the_old_body_lets_go_of_its_materials_before_it_goes`; `handoff/test-output.txt` (0 `ERROR` lines) | Launch-ready-2, 2026-11-12: every character swap under the headless renderer logged `Parameter "material" is null` (13 per test run, after the v0.5.x kit); gone. |
 
 ## Unrecorded: GAME.md contradicts the plan
 
