@@ -54,6 +54,17 @@ row whose notes say something is rough:
 | (new) README | — | still the template's README | Fix: launcher README with play instructions. |
 | (new) GAME.md Controls | — | two stale rows (one-press Start, a second LB+RB row) contradict the gap-close decisions | Fix the two rows; the stale 2D Pitch/Core loop/Camera/Art sections stay listed for Hermes. |
 
+## Verified on the producer box (2026-11-12, `feature/launch-ready-2`)
+
+- **Tests:** 175 test cases, 0 failures, 0 engine errors (`handoff/test-output.txt`), including the new
+  `tests/test_real_roster_voices.gd` (all 22 characters speak) and `tests/test_jarling_swap_clean.gd`.
+- **Session flow in real frames** (`handoff/frames/lr2_*`): intro, quit mid-intro, chooser with two players,
+  P2 drop-out, profile swap, launch and return, quit from the hub; every run exit 0, 0 errors.
+- **Soak:** 30 min headless (0 errors, 0 orphans, flat counts after a 2 min warm-up) and 30 min rendered
+  (frame time); numbers in `handoff/REPORT.md`.
+- **Export:** stamped, exported, zipped, unzipped, booted: launch, return, chooser, P2 in/out, Start-hold
+  quit, exit 0, 0 errors; no personal info in the pack.
+
 ## Verified on the producer box (2026-11-10/11, `feature/launch-ready-1`)
 
 - **Tests:** gdUnit4 `--ignoreHeadlessMode --continue`, all green (`handoff/test-output.txt`), including
@@ -93,10 +104,9 @@ row whose notes say something is rough:
 
 ## Needs Gary
 
-- [ ] Voices for Jeff, Chuck, Bloom and Old Reel in `openjar-characters` (cue names the launcher
-      uses: `catchphrase`, `cheer`, `join`, `ready`, `swap_in`, `win`), then
-      `scripts/tools/sync_characters.sh`. Until then they land and swap silently.
+- [x] Voices for Jeff, Chuck, Bloom and Old Reel (done: `openjar-characters` v0.5.3, resynced 2026-11-11;
+      all 22 speak, pinned by `tests/test_real_roster_voices.gd`).
 - [x] C-01 / C-14: `dev` → `main`, tag `v0.1.0`, boot the stable tile (done 2026-11-10: v0.1.0, v0.1.1
       booted; `v0.1.2` tagged at `ae25b42`; gap-close-3 sync).
-- [ ] V-04: move `scenes/ui/theme.tres` into `openjar-addons` (another repo; Kaden never sees it).
+- [x] V-04: the theme ships from `openjar-addons` v0.2.1 (vendor-theme-1).
 - [ ] A-04 (optional, Audio lane): a longer hub loop; the 18 s loop repeats a lot in free roam.
