@@ -111,6 +111,11 @@ func _label(font_size: int, outline: int) -> Label3D:
 ## Put a new body in (no animation). Keeps the ring, the tag and the pose state.
 func _set_model(model_scene: PackedScene) -> void:
 	if _model != null:
+		# Drop the rim-light override materials before the body goes: freed with the node, they
+		# die before its render instance and the headless renderer logs `"material" is null`.
+		for mi: MeshInstance3D in _model.find_children("*", "MeshInstance3D", true, false):
+			for s in mi.get_surface_override_material_count():
+				mi.set_surface_override_material(s, null)
 		_flip.remove_child(_model)
 		_model.queue_free()
 	_face_mats.clear()
