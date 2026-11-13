@@ -24,6 +24,7 @@ func before_test() -> void:
 	Roster.picks_path = PICKS
 	Roster.data_path = "res://data/roster.json"
 	Roster.args_override = PackedStringArray(["--test-pt1112"])
+	Roster.reload()   # picks from this test's own file (empty: the roster defaults), not from an earlier test
 	LauncherState.reset_session()
 	root = ""
 
@@ -67,6 +68,9 @@ func _hub(openjar_root: String) -> Node3D:
 
 
 ## A temp OPENJAR_ROOT: folder -> manifest; every game is a script that logs its arguments.
+## The fake game waits a little before it logs, like a real game on a slow box: the launcher's
+## RUNNING screen comes the moment the process is started, long before the game has read its
+## arguments, so a test must wait for the log line (_wait_for_log), never read it at RUNNING.
 func _games(manifests: Dictionary) -> void:
 	root = OS.get_cache_dir().path_join("openjar_pt1112_%d" % Time.get_ticks_usec())
 	log_path = root.path_join("launched.log")
@@ -79,7 +83,7 @@ func _games(manifests: Dictionary) -> void:
 		f.store_string(JSON.stringify(m))
 		f.close()
 		f = FileAccess.open(dir.path_join("game.sh"), FileAccess.WRITE)
-		f.store_string("#!/bin/sh\necho \"%s $@\" >> \"%s\"\nsleep 0.3\n" % [folder, log_path])
+		f.store_string("#!/bin/sh\nsleep 0.4\necho \"%s $@\" >> \"%s\"\nsleep 0.3\n" % [folder, log_path])
 		f.close()
 
 
@@ -121,11 +125,23 @@ func _flat(a: Vector3, b: Vector3) -> float:
 	return Vector2(a.x, a.z).distance_to(Vector2(b.x, b.z))
 
 
-func _wait_for_screen(hub: Node3D, screen: int, limit: float) -> void:
-	var waited := 0.0
-	while hub.screen != screen and waited < limit:
-		await get_tree().create_timer(0.1).timeout
-		waited += 0.1
+## Bounded waits on state, by the clock (the hub runs on real time here, not on _step).
+func _wait_for_screen(hub: Node3D, screen: int, limit: float) -> bool:
+	var until := Time.get_ticks_msec() + int(limit * 1000.0)
+	while hub.screen != screen and Time.get_ticks_msec() < until:
+		await get_tree().create_timer(0.05).timeout
+	return hub.screen == screen
+
+
+## The first whole line the fake game logged ("" if none came within `limit` seconds).
+func _wait_for_log(limit: float) -> String:
+	var until := Time.get_ticks_msec() + int(limit * 1000.0)
+	while Time.get_ticks_msec() < until:
+		var text := FileAccess.get_file_as_string(log_path) if FileAccess.file_exists(log_path) else ""
+		if text.contains("\n"):
+			return text.get_slice("\n", 0).strip_edges()
+		await get_tree().create_timer(0.05).timeout
+	return ""
 
 
 # ---------------------------------------------------------------- PT1112-1: walk on your own
@@ -251,13 +267,17 @@ func test_p2_at_a_jar_presses_a_and_launches_it_and_nobody_is_moved() -> void:
 	Input.action_release("p2_action")
 	assert_bool(hub.launch.active).is_true()
 	assert_int(hub._launcher_index).is_equal(hub.jarlings.find(p2))
-	await _wait_for_screen(hub, hub.Screen.RUNNING, 5.0)
+	assert_bool(await _wait_for_screen(hub, hub.Screen.RUNNING, 10.0)).is_true()
 	assert_array(fired).is_equal([["b-game", p2.profile_id]])
-	var line := FileAccess.get_file_as_string(log_path).strip_edges()
-	assert_str(line).starts_with("b-game --profile=%s" % p2.profile_id)
-	assert_str(line).contains("--p1-char=")   # both players' picks go to the game, as always
-	assert_str(line).contains("--p2-char=")
-	await _wait_for_screen(hub, hub.Screen.HUB, 5.0)
+	assert_str(p2.profile_id).is_equal("p2")
+	# the launch request the hub made: P2's profile, both players' picks, as always
+	var want := "--profile=p2 --p1-char=%s --p2-char=%s" % [Roster.pick(Players.P1), Roster.pick(Players.P2)]
+	assert_str(Roster.pick(Players.P1)).is_not_empty()
+	assert_str(Roster.pick(Players.P2)).is_not_empty()
+	assert_str(" ".join(hub._launch_cmd.args)).is_equal(want)
+	# and what the game itself got (it logs once it is up, which is after RUNNING)
+	assert_str(await _wait_for_log(10.0)).is_equal("b-game " + want)
+	assert_bool(await _wait_for_screen(hub, hub.Screen.HUB, 10.0)).is_true()
 	await get_tree().create_timer(1.4).timeout   # return grace and the jump back out
 	assert_float(_flat(p1.position, p1_at)).is_less(0.05)   # P1 was never pulled over to P2's jar
 	assert_float(_flat(p2.position, p2_at)).is_less(0.3)    # P2 pops out where it stood
