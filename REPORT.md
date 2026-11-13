@@ -20,7 +20,7 @@ against the launcher hub on `dev`, and fixes the one that failed (FR-4: silent p
 
 - `1d324a1 hub: every ignored press answers with the refusal boop` (`scripts/hub/hub.gd`, `tests/test_hub_feel_rules.gd`)
 - `14f5592 tests: the D-pad walks the hub character on both pad slots` (`tests/test_hub_dpad.gd`)
-- `PLANSHA docs: PLAN-STATUS S8 feel rules, FR-1 to FR-7 (rules-audit-1)` (`PLAN-STATUS.md`, `REPORT.md`)
+- `bd1834d docs: PLAN-STATUS S8 feel rules, FR-1 to FR-7 (rules-audit-1)` (`PLAN-STATUS.md`, `REPORT.md`)
 
 No change to `project.godot`, `addons/openjar/`, art, audio or store files.
 
