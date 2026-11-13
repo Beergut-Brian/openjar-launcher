@@ -234,6 +234,40 @@ func test_p2_dropping_out_is_heard_and_seen() -> void:
 	assert_bool(p2._shape_tween != null and p2._shape_tween.is_valid()).is_true()   # the hop
 
 
+## PF-5: P1's pad going away is heard and seen too, through the real Players path; P1's Jarling
+## stays P1's, stands still, and any pad's button makes it P1 again.
+func test_p1_dropping_out_is_heard_and_seen() -> void:
+	var hub := await _hub()
+	var press := InputEventJoypadButton.new()   # a button no action uses: it only claims the pad
+	press.device = 7
+	press.button_index = JOY_BUTTON_PADDLE1
+	press.pressed = true
+	Input.parse_input_event(press)
+	await get_tree().process_frame
+	var release := press.duplicate()
+	release.pressed = false
+	Input.parse_input_event(release)
+	await _wait(1.0)
+	assert_int(Players.device_of(Players.P1)).is_equal(7)
+	var p1: HubJarling = hub.jarling_for(Players.P1)
+	p1.move_input = Vector2.RIGHT
+	Audio.last_cue = ""
+	Players._on_joy_connection_changed(7, false)
+	assert_int(Players.device_of(Players.P1)).is_equal(-1)
+	assert_str(Audio.last_cue).is_equal(hub.LEAVE_SOUND)
+	assert_bool(p1._shape_tween != null and p1._shape_tween.is_valid()).is_true()   # the hop
+	assert_bool(p1.move_input == Vector2.ZERO).is_true()   # stands where it is
+	assert_bool(p1.is_held()).is_true()                    # still P1's Jarling
+	assert_object(hub.jarling_for(Players.P1)).is_same(p1)
+	# a game on the TV: no bye over it
+	hub.screen = hub.Screen.RUNNING
+	Audio.last_cue = ""
+	hub._on_player_left(Players.P1)
+	assert_str(Audio.last_cue).is_equal("")
+	hub.screen = hub.Screen.HUB
+	Players._bind(Players.P1, -1)   # hand the pad back so other suites start with nobody joined
+
+
 func test_the_chooser_has_its_own_swap_sound() -> void:
 	var hub := await _hub()
 	assert_str(hub.CHANGE_SOUND).is_not_equal("intro_pop")

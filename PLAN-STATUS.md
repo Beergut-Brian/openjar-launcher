@@ -41,6 +41,10 @@ the plan-status lane against the code, the test run and real frames, not against
   PT1112-2 (both built). `scripts/tools/test.sh` (clean import first; user data, picks and temp jars under
   `.scratch/`) exits 0: 186 test cases, 0 failures, 0 engine errors (`handoff/test-output.txt`). **Totals
   (recount):** 82 rows: 67 built, 11 superseded, 3 partial, 1 missing.
+- **Gap-close-5** (`feature/launcher-gap-close-5`, 2026-11-13): audit against `dev` at `2e0a2ce`. Open rows were V-01, V-02
+  (Kaden's pick), K-06, K-07 (weekend TV check) and PF-5 (`open`); only PF-5 could move: PF-5 to built. `scripts/tools/test.sh`
+  exits 0: 194 test cases, 0 failures, 0 engine errors (`handoff/test-output.txt`). **Totals (recount):** 88 rows: 73 built,
+  11 superseded, 3 partial (V-01, V-02, K-07), 1 missing (K-06).
 - **Status values:** built / partial / missing / superseded / dropped / later (see `~/openjar/lanes/plan-status-format.md`).
 
 Sources (oldest first):
@@ -198,7 +202,7 @@ frame and result in `handoff/PLAYER-FLOW.md` (frames `handoff/shots/pf-*.png`).
 | PF-2 | Player flow | A game that crashes at once popped you back out cheering "I'm back!" | built | `hub.gd` `failed_to_start` (error exit within 4 s, or will not start) → `ui_back` and a head shake, log `it never really started`; `tests/test_player_flow.gd::test_an_error_exit_straight_away_counts_as_never_started`, `::test_a_game_that_crashes_at_once_brings_you_back_with_a_no_not_a_cheer`; frames `pf-09-crash-before-fix.png`, `pf-2-crash-return.png` | A clean quit, however quick, still gets the cheer. |
 | PF-3 | Player flow | The D-pad did not walk (README/GAME.md: "Left stick / D-pad") | built | `project.godot` p1_/p2_move_* gain D-pad buttons (`Players._bind` already rebinds them per pad); `tests/test_player_flow.gd::test_every_move_action_has_its_dpad_button`, `::test_a_dpad_press_joins_and_walks_player_one`; frame `pf-3-dpad-walk.png` | Systems lane file (input map), one-line-per-action change. |
 | PF-4 | Player flow | Keyboard: arrow keys are P2's, README said they walk (P1 never moved) | built | `README.md` controls table (WASD/Space/Shift for P1, arrows/Enter/Ctrl for P2); frame `pf-10-keyboard-arrows-move-p2.png` | GAME.md's Controls row still says "arrow keys": Hermes's doc. |
-| PF-5 | Player flow | P1's pad going away is silent (P2 has a bye) | open | `handoff/PLAYER-FLOW.md` row 18 | Harmless: any button on a free pad makes it P1 again. Not changed. |
+| PF-5 | Player flow | P1's pad going away is silent (P2 has a bye) | built | `hub.gd` `_on_player_left` (P1: the leave cue, a hop, the Jarling stops where it is and stays P1's; not while a game has the TV); `tests/test_launch_ready.gd::test_p1_dropping_out_is_heard_and_seen` (real pad join, then the real `Players` disconnect path); frames `handoff/frames/pf5_p1_pad_leaves_strip.jpg`, `pf5_01_walking_on_pad.jpg` … `pf5_03_keys_hint_after.jpg` | Was `open` (not a status value), counted here as partial. Gap-close-5, 2026-11-13: same bye as P2 (`player_leave` and a hop). Any button on a free pad still makes it P1 again. The hop is too small to read in a still; the test pins it. |
 | PF-6 | Player flow (tooling) | Scripted runs could not press real buttons | built | `hub.gd` demo `btn:` / `axis:` / `key:` / `unplug:` (real input events through `Players` and the input map) | Used for every PF frame. |
 
 ## Unrecorded: GAME.md contradicts the plan

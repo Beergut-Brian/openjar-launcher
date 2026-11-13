@@ -424,7 +424,16 @@ func _on_player_joined(player: int, _device: int) -> void:
 
 ## P2's pad goes away (unplugged, out of battery): their Jarling stands and waits where it is, with a
 ## little "bye" (a sound and a hop), so dropping out is never silent.
+## P1's pad going away gets the same bye on P1's Jarling (PF-5): it stays P1's and stands still until
+## any pad presses a button and becomes P1 again. Not while a game has the TV.
 func _on_player_left(player: int) -> void:
+	if player == Players.P1 and screen == Screen.HUB:
+		cancel_say(Players.P1)
+		var lead := lead_jarling()
+		lead.stop()
+		Audio.play(LEAVE_SOUND)
+		if not lead.busy:
+			lead.cheer(0.5)
 	if player == Players.P2 and two_players:
 		cancel_say(Players.P2)
 		two_players = false
