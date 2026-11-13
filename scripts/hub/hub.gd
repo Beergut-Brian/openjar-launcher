@@ -49,6 +49,7 @@ const QUIT_HOLD := 1.5
 ## so while one runs, holding Start this long closes it and you come home. Longer than QUIT_HOLD,
 ## so a pause press in the game never does it. Godot games quit themselves and are never stopped.
 const HOME_HOLD := 2.0
+const FAIL_FAST_S := 4.0          # a game that ends this soon with an error never really started (PF-2)
 const STOP_GRACE := 3.0           # after asking a game to stop (TERM): kill it if it is still there
 ## A-05: the launching character's own voice on top of the beat sounds: a happy bark as it leaps
 ## into the jar, another as it pops back out. First one the character has; none: just the beat sound.
@@ -93,6 +94,8 @@ var _quit_combo := HoldCombo.new(QUIT_HOLD)
 var _quit_down := false
 var _quit_needs_release := false         # Start still held from the game: let go before it counts
 var _home_combo := HoldCombo.new(HOME_HOLD)
+var _started_ms := 0                     # when the running game started
+var last_return_failed := false          # the last game came straight back with an error (PF-2)
 var _running_command := false            # the running game is a `command` entry (home hold works)
 var _stopping := false
 var _quitting := false
@@ -827,10 +830,10 @@ func _start_game() -> void:
 	var pid := OS.create_process(_launch_cmd.path, _launch_cmd.args) if not _launch_cmd.path.is_empty() else -1
 	if pid <= 0:
 		push_warning("launcher: could not start %s" % _launch_cmd.path)
-		Audio.play("ui_back")
-		_play_return(j)
+		_play_return(j, true)
 		return
 	_pid = pid
+	_started_ms = Time.get_ticks_msec()
 	_running_slug = entry.slug
 	_running_command = not entry.command.is_empty()
 	launched.emit(entry.slug, j.profile_id)
@@ -840,7 +843,9 @@ func _start_game() -> void:
 func _on_process_watch() -> void:
 	if screen != Screen.RUNNING or OS.is_process_running(_pid):
 		return
-	print("launcher: %s exited (code %d)" % [_running_slug, OS.get_process_exit_code(_pid)])
+	var code := OS.get_process_exit_code(_pid)
+	var failed := failed_to_start(code, Time.get_ticks_msec() - _started_ms)
+	print("launcher: %s exited (code %d)%s" % [_running_slug, code, ", it never really started" if failed else ""])
 	_pid = -1
 	_stopping = false
 	_quit_needs_release = true   # Start may still be down (the home hold, a game's own quit)
@@ -849,12 +854,20 @@ func _on_process_watch() -> void:
 	_rescan(_running_slug, true)   # pick up games installed or updated meanwhile; nobody moves
 	_set_screen(Screen.HUB)
 	_input_from_ms = Time.get_ticks_msec() + RETURN_GRACE_MS
-	_play_return(jarlings[_launcher_index])
+	_play_return(jarlings[_launcher_index], failed)
+
+
+## PF-2: an error exit within FAIL_FAST_S of starting means the game never came up (a broken build, a
+## missing library). The player must not get the happy "I'm back!" as if they had played.
+static func failed_to_start(exit_code: int, ran_ms: int) -> bool:
+	return exit_code != 0 and ran_ms < int(FAIL_FAST_S * 1000.0)
 
 
 ## Back in the hub: the flash clears, the Jarling pops out of its jar and the lid drops back on.
-func _play_return(j: HubJarling) -> void:
+## failed: the game never started (PF-2): a low sound and a no-no head shake instead of the cheer.
+func _play_return(j: HubJarling, failed: bool = false) -> void:
 	_dived = false
+	last_return_failed = failed
 	_cam_snap = true
 	create_tween().tween_property(_flash, "color:a", 0.0, 0.35)
 	for other in jarlings:
@@ -873,7 +886,11 @@ func _play_return(j: HubJarling) -> void:
 	if f >= 0:
 		var spot := spots[f]
 		Audio.play("jar_pop_out")
-		shout(j, RETURN_BARKS)   # "I'm back!"
+		if failed:
+			Audio.play("ui_back")
+			_shake_on_landing(j)
+		else:
+			shout(j, RETURN_BARKS)   # "I'm back!"
 		spot.splash()
 		spot.drop_lid(0.5)
 		var stand := _launch_from
@@ -882,6 +899,17 @@ func _play_return(j: HubJarling) -> void:
 		j.jump_out(spot.mouth_position(), HubLayout.walkable(stand, spots.size()))
 	else:
 		j.jump_out(j.global_position, j.global_position)
+		if failed:
+			Audio.play("ui_back")
+			_shake_on_landing(j)
+
+
+func _shake_on_landing(j: HubJarling) -> void:
+	j.set_expression("surprised")
+	while is_instance_valid(j) and j.busy:
+		await get_tree().process_frame
+	if is_instance_valid(j):
+		j.shake()
 
 
 ## While a game runs: hidden, no input, ~10 fps, and minimised if MINIMIZE_WHILE_RUNNING.
@@ -1147,6 +1175,7 @@ func _run_demo() -> void:
 			"walk":
 				_demo_move = Vector2(float(d[2]), float(d[3]))
 				_demo_move_until = _clock + float(d[4])
+			"unplug": Players._on_joy_connection_changed(int(d[2]), false)   # a pad goes away (battery, cable)
 			"btn", "axis", "key":   # real input events (player-flow QA): they go through Players and the input map
 				Input.parse_input_event(demo_event(d))
 

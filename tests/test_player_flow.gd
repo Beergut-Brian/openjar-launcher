@@ -5,6 +5,7 @@ extends GdUnitTestSuite
 
 const PROFILE := "test_pflow"
 const HUB := "res://scenes/hub/hub.tscn"
+const HubScript := preload("res://scripts/hub/hub.gd")
 const PICKS := "user://test_pflow/players.json"
 const DT := 1.0 / 60.0
 const OLD_FOLLOW_REACH := 1.9   # the old tag-along never let the friend get further away than this
@@ -169,3 +170,33 @@ func test_the_empty_jar_never_offers_jump_in() -> void:
 	_step(hub, 40)
 	assert_int(hub.focus[hub.jarlings.find(p1)]).is_greater_equal(0)
 	assert_bool(p1.go_hint_visible()).is_false()
+
+
+# ---------------------------------------------------------------- PF-2: a game that never starts
+
+func test_an_error_exit_straight_away_counts_as_never_started() -> void:
+	assert_bool(HubScript.failed_to_start(3, 300)).is_true()
+	assert_bool(HubScript.failed_to_start(0, 300)).is_false()       # a quick, clean quit is a quit
+	assert_bool(HubScript.failed_to_start(1, 60000)).is_false()     # played a minute, then crashed: they played
+
+
+func test_a_game_that_crashes_at_once_brings_you_back_with_a_no_not_a_cheer() -> void:
+	_games({"a-game": {"slug": "a-game"}, "b-game": {"slug": "b-game"}})
+	var f := FileAccess.open(root.path_join("b-game").path_join("game.sh"), FileAccess.WRITE)
+	f.store_string("#!/bin/sh\necho \"b-game $@\" >> \"%s\"\nexit 3\n" % log_path)
+	f.close()
+	var hub := await _hub(root)
+	_walk_to_jar(hub, Players.P1, 1)
+	hub.press_action(Players.P1)
+	assert_bool(hub.launch.active).is_true()
+	await _wait_for_screen(hub, hub.Screen.RUNNING, 5.0)
+	await _wait_for_screen(hub, hub.Screen.HUB, 5.0)
+	assert_bool(hub.last_return_failed).is_true()
+	# and a game that runs and quits cleanly still gets the happy return
+	await get_tree().create_timer(1.4).timeout
+	_walk_to_jar(hub, Players.P1, 0)
+	hub.press_action(Players.P1)
+	await _wait_for_screen(hub, hub.Screen.RUNNING, 5.0)
+	await _wait_for_screen(hub, hub.Screen.HUB, 5.0)
+	assert_bool(hub.last_return_failed).is_false()
+
