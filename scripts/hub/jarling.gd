@@ -33,6 +33,7 @@ var height := 1.6                  # top of the head above the feet, in world un
 var character_id := ""             # the Roster id it shows ("" = a generic fallback body)
 var swapping := false              # mid swap_to(): the chooser ignores presses until it lands
 var hint_enabled := false          # the hub allows the hint (held, in the hub, no launch playing)
+var go_hint_enabled := false       # the hub: a jar with a game is in focus (shows "A: jump in")
 
 var _model: Node3D
 var _flip: Node3D                  # pivot at the tummy, so a somersault turns about the middle
@@ -48,6 +49,8 @@ var _tag: Label3D
 var _tag_tween: Tween
 var _hint: Sprite3D                 # the chooser hint: a button picture (HintGlyph), never words
 var hint_kind := HintGlyph.Kind.SELECT
+var _go_hint: Sprite3D              # "A: jump in" over the head while a jar is in focus (PF-1)
+var go_hint_kind := HintGlyph.Kind.A
 var _still := 0.0
 
 
@@ -87,6 +90,12 @@ func setup(model_scene: PackedScene, id: String, ring_color: Color, model_size: 
 	_hint.top_level = true          # stays on the floor in front of the ring whichever way it faces
 	_hint.modulate.a = 0.0
 	_hint.visible = false
+	_go_hint = _hint.duplicate()
+	add_child(_go_hint)
+	_go_hint.top_level = true
+	_go_hint.pixel_size = 0.0055
+	_go_hint.modulate.a = 0.0
+	_go_hint.visible = false
 	_play("idle")
 
 
@@ -359,6 +368,7 @@ func _process(delta: float) -> void:
 	_clock += delta
 	_ring.scale = Vector3(1, 0.1, 1) * (1.0 + sin(_clock * 4.0) * 0.04)
 	_update_hint(delta)
+	_update_go_hint(delta)
 	if busy:
 		return
 	var vel := stick_velocity(move_input if _held else Vector2.ZERO)
@@ -392,6 +402,26 @@ func _update_hint(delta: float) -> void:
 	_hint.visible = _hint.modulate.a > 0.01
 	if _hint.visible:
 		_hint.global_position = global_position + Vector3(0, 0.25, 0.9)
+
+
+## "A: jump in": over the head as soon as a jar is in focus (a new player's first question is how to
+## start a game), gone during a jump, a swap or a launch. It sits above the name tag when that shows.
+func _update_go_hint(delta: float) -> void:
+	var want := 1.0 if go_hint_enabled and _held and not busy and not swapping and visible else 0.0
+	_go_hint.modulate.a = move_toward(_go_hint.modulate.a, want, delta * (6.0 if want > 0.0 else 12.0))
+	_go_hint.visible = _go_hint.modulate.a > 0.01
+	if _go_hint.visible:
+		var lift := 0.55 if _tag.visible else 0.0
+		_go_hint.global_position = global_position + Vector3(0, height + 0.55 + lift + sin(_clock * 3.0) * 0.05, 0)
+
+
+func go_hint_visible() -> bool:
+	return _go_hint.visible and _go_hint.modulate.a > 0.5
+
+
+func set_go_glyph(kind: HintGlyph.Kind, player_color: Color = color) -> void:
+	go_hint_kind = kind
+	_go_hint.texture = HintGlyph.texture(kind, player_color)
 
 
 ## Which button the hint shows: the pad's Select, or the keyboard player's key. The hub sets it.

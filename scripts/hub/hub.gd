@@ -487,8 +487,10 @@ func _process(delta: float) -> void:
 		_read_players()
 		if _dev_combo.update(Input.is_action_pressed("launcher_lb"), Input.is_action_pressed("launcher_rb"), delta):
 			_toggle_dev()
-	for j in jarlings:
+	for i in jarlings.size():
+		var j := jarlings[i]
 		j.hint_enabled = screen == Screen.HUB and not launch.active and j.is_held()
+		j.go_hint_enabled = j.hint_enabled and not intro_playing() and focus[i] >= 0 and not spots[focus[i]].empty
 	if launch.active:
 		for beat in launch.advance(delta):
 			_on_launch_beat(beat)
@@ -673,8 +675,11 @@ func _update_hints() -> void:
 	for p: int in [Players.P1, Players.P2]:
 		var j := jarling_for(p)
 		if j != null:
+			var pad := Players.device_of(p) >= 0 or pads
 			var key := HintGlyph.Kind.TAB if p == Players.P1 else HintGlyph.Kind.SLASH
-			j.set_hint_glyph(HintGlyph.Kind.SELECT if Players.device_of(p) >= 0 or pads else key, Players.COLOR[p])
+			j.set_hint_glyph(HintGlyph.Kind.SELECT if pad else key, Players.COLOR[p])
+			var go_key := HintGlyph.Kind.SPACE if p == Players.P1 else HintGlyph.Kind.ENTER
+			j.set_go_glyph(HintGlyph.Kind.A if pad else go_key, Players.COLOR[p])
 
 
 ## Before any pad joins, P1 and P2 pad events both match every device; only the keyboard can tell
@@ -1142,6 +1147,32 @@ func _run_demo() -> void:
 			"walk":
 				_demo_move = Vector2(float(d[2]), float(d[3]))
 				_demo_move_until = _clock + float(d[4])
+			"btn", "axis", "key":   # real input events (player-flow QA): they go through Players and the input map
+				Input.parse_input_event(demo_event(d))
+
+
+## A synthetic input event for a demo script: btn:<device>:<button>:<1|0>, axis:<device>:<axis>:<value>,
+## key:<keycode>:<1|0> (e.g. key:4194305:1 is Escape down). Real events, so a pad joins as it would.
+static func demo_event(d: PackedStringArray) -> InputEvent:
+	match d[1]:
+		"btn":
+			var b := InputEventJoypadButton.new()
+			b.device = int(d[2])
+			b.button_index = int(d[3]) as JoyButton
+			b.pressed = d[4] == "1"
+			b.pressure = 1.0 if b.pressed else 0.0
+			return b
+		"axis":
+			var m := InputEventJoypadMotion.new()
+			m.device = int(d[2])
+			m.axis = int(d[3]) as JoyAxis
+			m.axis_value = float(d[4])
+			return m
+	var k := InputEventKey.new()
+	k.keycode = int(d[2]) as Key
+	k.physical_keycode = k.keycode
+	k.pressed = d[3] == "1"
+	return k
 
 
 ## A pretend stick for "go": full tilt towards the jar's stand point, easing off at the end, and let
