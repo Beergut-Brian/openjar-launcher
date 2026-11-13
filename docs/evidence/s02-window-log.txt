@@ -18,3 +18,22 @@ _NET_WM_NAME:  not found.
 43 t=2.5  _NET_WM_STATE(ATOM) = _NET_WM_STATE_FULLSCREEN WM_STATE(WM_STATE): window state: Normal icon window: 0x0 active=hub
 7 t=24  _NET_WM_STATE(ATOM) = _NET_WM_STATE_HIDDEN, _NET_WM_STATE_FULLSCREEN WM_STATE(WM_STATE): window state: Iconic icon window: 0x0 active=other
 6 t=27.5  _NET_WM_STATE(ATOM) = _NET_WM_STATE_FULLSCREEN WM_STATE(WM_STATE): window state: Normal icon window: 0x0 active=hub
+
+# Gap-close-4 re-run (2026-11-12, dev at ff70a86, branch feature/launcher-gap-close-4), same harness and fake 4 s game:
+## launcher log
+launcher: version v0.0.0-local
+launcher: 1 entries in <worktree>/.scratch/wmroot
+launcher: interactive (hub, 1 jars) after 4977 ms, unix 1794531498.698 (ready 1431 (+1431), characters 1817 (+386), jars 1876 (+59), first frame 4977 (+3101))
+launcher: starting <worktree>/.scratch/wmroot/slow-game/game.sh --profile=p1 --p1-char=jeff --p2-char=chuck
+launcher: window: minimise while the game runs, done (mode 1) after 3 ms
+launcher: slow-game exited (code 0)
+launcher: 1 entries in <worktree>/.scratch/wmroot
+launcher: window: restore after the game, done (mode 3) after 233 ms
+## window manager
+openbox alive: yes
+_NET_SUPPORTING_WM_CHECK(WINDOW): window id # 0x20000e
+_NET_WM_NAME:  not found.
+## hub window state, sampled every 0.5 s by xprop (count, state)
+     23  _NET_WM_STATE(ATOM) = _NET_WM_STATE_FULLSCREEN WM_STATE(WM_STATE): window state: Normal icon window: 0x0 active=hub
+      7  _NET_WM_STATE(ATOM) = _NET_WM_STATE_HIDDEN, _NET_WM_STATE_FULLSCREEN WM_STATE(WM_STATE): window state: Iconic icon window: 0x0 active=other
+     28  _NET_WM_STATE(ATOM) = _NET_WM_STATE_FULLSCREEN WM_STATE(WM_STATE): window state: Normal icon window: 0x0 active=hub

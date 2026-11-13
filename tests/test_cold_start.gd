@@ -78,3 +78,47 @@ func test_a_test_run_keeps_its_picks_away_from_the_shared_file() -> void:
 	assert_bool(Roster.is_test_run(OS.get_cmdline_args())).is_true()
 	assert_str(Roster.picks_path).is_equal(Roster.TEST_PICKS)
 	assert_str(ProjectSettings.globalize_path(Roster.TEST_PICKS)).is_not_equal(Roster.shared_path())
+
+
+## K-07 budget, the whole boot headless: a real `godot` process from engine start (autoloads, the
+## boot scene, the hub, 8 jars) to its "launcher: interactive" line. ~0.5 to 1.4 s headless on the
+## producer box; the 10 s target minus the first-frame compile on a real GPU is what this pins.
+## User data and the shared picks file go to a scratch dir under user://, never the real ones.
+const BOOT_BUDGET_MS := 5000
+const BOOT_SCRATCH := "user://test_cold_start_boot"
+
+
+static func interactive_ms(log_text: String) -> int:
+	var re := RegEx.create_from_string("launcher: interactive \\(hub, \\d+ jars\\) after (\\d+) ms")
+	var m := re.search(log_text)
+	return int(m.get_string(1)) if m else -1
+
+
+func test_the_interactive_line_is_parsed() -> void:
+	assert_int(interactive_ms("x\nlauncher: interactive (hub, 8 jars) after 812 ms, unix 1.0 (ready 10)\n")) \
+		.is_equal(812)
+	assert_int(interactive_ms("launcher: version v?")).is_equal(-1)
+
+
+func test_a_headless_boot_is_interactive_well_inside_the_budget() -> void:
+	var scratch := ProjectSettings.globalize_path(BOOT_SCRATCH)
+	DirAccess.make_dir_recursive_absolute(scratch.path_join("data"))
+	DirAccess.make_dir_recursive_absolute(scratch.path_join("config"))
+	var script := scratch.path_join("boot.sh")
+	var f := FileAccess.open(script, FileAccess.WRITE)
+	f.store_string("#!/bin/sh\nXDG_DATA_HOME=\"$1/data\" XDG_CONFIG_HOME=\"$1/config\" OPENJAR_ROOT=\"$2\" " +
+		"HUB_DEMO=follow exec \"$3\" --headless --path \"$4\" --quit-after 5 2>&1\n")
+	f.close()
+	var out: Array = []
+	var code := OS.execute("sh", [script, scratch, ProjectSettings.globalize_path("res://tests/fixtures/hub_8"),
+		OS.get_executable_path(), ProjectSettings.globalize_path("res://")], out, true)
+	var log_text := "\n".join(out)
+	assert_int(code).override_failure_message(log_text).is_equal(0)
+	assert_str(log_text).not_contains("SCRIPT ERROR")
+	assert_bool(log_text.contains("launcher: 8 entries")).override_failure_message(log_text).is_true()
+	var ms := interactive_ms(log_text)
+	assert_int(ms).override_failure_message("no interactive line:\n" + log_text).is_greater(0)
+	assert_int(ms).override_failure_message("boot took %d ms" % ms).is_less(BOOT_BUDGET_MS)
+	# its saves and picks stayed in the scratch dir: the real shared players.json was never touched
+	assert_bool(DirAccess.dir_exists_absolute(scratch.path_join("data/godot/app_userdata"))).is_true()
+	OS.execute("rm", ["-rf", scratch])
