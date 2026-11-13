@@ -126,3 +126,34 @@ func test_expand_home() -> void:
 	assert_str(ManifestScanner.expand_home("~/Games/openjar")).is_equal(home + "/Games/openjar")
 	assert_str(ManifestScanner.expand_home("/srv/games")).is_equal("/srv/games")
 	assert_str(ManifestScanner.default_root()).is_not_empty()
+
+
+## Playtest 2026-11-12: "Dev mode shows multiple versions of the game. It should only show the dev version."
+func test_dev_on_shows_one_entry_per_game_dev_first() -> void:
+	_game("kick-off", {"slug": "kick-off", "binary": "g"}, ["g"])
+	_game("kick-off-dev", {"slug": "kick-off", "binary": "g", "dev": true}, ["g"])
+	_game("solo-stable", {"binary": "g"}, ["g"])
+	_game("worm-dev", {"slug": "worm", "binary": "g", "dev": true}, ["g"])
+	var all := ManifestScanner.scan(root)
+	assert_int(all.size()).is_equal(4)
+	var off := ManifestScanner.filter_dev(all, false)
+	assert_array(_slugs(off)).contains_exactly(["kick-off", "solo-stable"])
+	assert_bool(off[0].dev).is_false()
+	var on := ManifestScanner.filter_dev(all, true)
+	assert_array(_slugs(on)).contains_exactly(["kick-off", "solo-stable", "worm"])   # one per slug
+	assert_bool(on[0].dev).is_true()                      # the dev build, not the stable one
+	assert_str(on[0].dir.get_file()).is_equal("kick-off-dev")
+	assert_bool(on[1].dev).is_false()                     # no dev build: the stable one
+	assert_bool(on[2].dev).is_true()                      # dev only: still there
+
+
+func test_dev_order_does_not_matter_and_a_dev_suffix_slug_is_the_same_game() -> void:
+	var stable := {"slug": "kick-off", "dev": false}
+	var dev := {"slug": "kick-off-dev", "dev": true}
+	var list: Array[Dictionary] = [dev, stable]
+	assert_array(ManifestScanner.filter_dev(list, true)).is_equal([dev])
+	list = [stable, dev]
+	assert_array(ManifestScanner.filter_dev(list, true)).is_equal([dev])
+	assert_array(ManifestScanner.filter_dev(list, false)).is_equal([stable])
+	assert_str(ManifestScanner.game_of(dev)).is_equal("kick-off")
+	assert_str(ManifestScanner.game_of({"slug": "not-a-dev", "dev": false})).is_equal("not-a-dev")
