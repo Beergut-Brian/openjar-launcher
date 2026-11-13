@@ -200,3 +200,40 @@ func test_a_game_that_crashes_at_once_brings_you_back_with_a_no_not_a_cheer() ->
 	await _wait_for_screen(hub, hub.Screen.HUB, 5.0)
 	assert_bool(hub.last_return_failed).is_false()
 
+
+# ---------------------------------------------------------------- PF-3: the D-pad walks
+
+func test_every_move_action_has_its_dpad_button() -> void:
+	var want := {"move_up": JOY_BUTTON_DPAD_UP, "move_down": JOY_BUTTON_DPAD_DOWN,
+			"move_left": JOY_BUTTON_DPAD_LEFT, "move_right": JOY_BUTTON_DPAD_RIGHT}
+	for p: int in [Players.P1, Players.P2]:
+		for a: String in want:
+			var found := false
+			for ev in InputMap.action_get_events(Players.action(p, a)):
+				if ev is InputEventJoypadButton and ev.button_index == want[a]:
+					found = true
+			assert_bool(found).override_failure_message("%s has no D-pad" % Players.action(p, a)).is_true()
+
+
+func test_a_dpad_press_joins_and_walks_player_one() -> void:
+	var hub := await _hub(ProjectSettings.globalize_path("res://tests/fixtures/hub_8"))
+	var p1: HubJarling = hub.jarling_for(Players.P1)
+	var at := p1.position
+	var press := InputEventJoypadButton.new()
+	press.device = 0
+	press.button_index = JOY_BUTTON_DPAD_LEFT
+	press.pressed = true
+	Input.parse_input_event(press)
+	await get_tree().process_frame
+	assert_int(Players.device_of(Players.P1)).is_equal(0)   # the D-pad press claimed the pad
+	assert_float(Players.move_vector(Players.P1).x).is_less(-0.9)
+	_step(hub, 40)
+	var release := press.duplicate()
+	release.pressed = false
+	Input.parse_input_event(release)
+	await get_tree().process_frame
+	_step(hub, 20)
+	assert_float(p1.position.x).is_less(at.x - 1.0)
+	# hand the pad back so other suites start with nobody joined
+	Players._device_of[Players.P1] = -1
+	Players._bind(Players.P1, -1)
