@@ -15,10 +15,10 @@ Either pad drives it; the first pad is player 1 (green ring), a second pad drops
 
 | Input | Does |
 | --- | --- |
-| Left stick / D-pad / arrow keys | Walk anywhere on the island; all the way over runs |
+| Left stick / D-pad (keys: WASD for P1, arrow keys for P2) | Walk anywhere on the island; all the way over runs |
 | (walk up to a jar) | It comes into focus: a tick, the jar bounces, its lid lifts |
-| A (Space) | At a jar: jump in and play that game. Anywhere else: a happy cheer |
-| B (Shift) | Solo: switch save profile (you become that profile's character). Two players: a cheer |
+| A (Space; P2 Enter) | At a jar: jump in and play that game (the A button shows over your head). Anywhere else: a happy cheer |
+| B (Shift; P2 Ctrl) | Solo: switch save profile (you become that profile's character). Two players: a cheer |
 | Select / Back (Tab, or `/` for keyboard P2) | Change your character in place; it says its catchphrase |
 | Hold LB + RB for 1 s | Show or hide the `(dev)` builds (their jars wear a charcoal lid), for this run only |
 | Hold Start (Esc) 1.5 s | Quit to Steam. A door badge fills while held; a tap only ticks |
