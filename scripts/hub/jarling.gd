@@ -1,4 +1,5 @@
-## A Jarling in the hub: walks and runs where the stick says, follows its friend, cheers, jumps into jars.
+## A Jarling in the hub: walks and runs where its own player's stick says, cheers, jumps into jars.
+## Nobody's Jarling (P2 not joined yet) just stands where it is: it never tags along (playtest 2026-11-12).
 ## The two held Jarlings are the players' Roster picks; swap_to() changes who one is in place, with
 ## the chooser's squash / poof / pop and a name tag. Residents use the same class and just stand about
 ## and cheer. A held Jarling that stands still for a moment shows the "change" hint by its ring.
@@ -10,7 +11,6 @@ const WALK_SPEED := 4.4            # stick most of the way over
 const RUN_SPEED := 7.0             # stick (or D-pad / keys) all the way over: a run
 const RUN_FROM := 0.85             # stick tilt where the walk starts turning into a run
 const ACCEL := 14.0                # how fast it gets up to speed and stops: snappy, never icy
-const FOLLOW_SPEED := 5.2
 const TURN_RATE := 12.0
 const SWAP_SQUASH := 0.07          # chooser swap: squash, become the next one in a poof, pop past full size
 const SWAP_POP := 0.32
@@ -24,7 +24,6 @@ const EXPR := {"neutral": Vector3(0, 0, 0), "happy": Vector3(0.5, 0, 0),
 var profile_id := "p1"
 var color := Color.WHITE
 var move_input := Vector2.ZERO     # stick, set by the hub each frame (x right, y towards the camera)
-var follow: HubJarling = null      # set = nobody holds this Jarling, it tags along
 var face_point := Vector3.INF      # look here while standing still
 var busy := false                  # mid jump into / out of a jar
 var moving := false
@@ -362,14 +361,7 @@ func _process(delta: float) -> void:
 	_update_hint(delta)
 	if busy:
 		return
-	var vel := Vector3.ZERO
-	if follow != null:
-		var to := follow.global_position - global_position
-		to.y = 0.0
-		if to.length() > 1.9 and follow.visible:
-			vel = to.normalized() * minf(FOLLOW_SPEED, (to.length() - 1.5) * 4.0)
-	else:
-		vel = stick_velocity(move_input)
+	var vel := stick_velocity(move_input if _held else Vector2.ZERO)
 	_vel = _vel.lerp(vel, 1.0 - exp(-delta * ACCEL))
 	if _vel.length() < 0.05 and vel == Vector3.ZERO:
 		_vel = Vector3.ZERO
@@ -438,8 +430,13 @@ func _squash() -> void:
 	t.tween_property(_model, "scale", Vector3.ONE * size, 0.14)
 
 
+## Held by a player: walks on that player's stick only. Not held: stands still where it is.
+func is_held() -> bool:
+	return _held
+
+
 ## The ring shows which Jarlings are held by a player, in that player's colour (P1 green, P2 red);
-## a tag-along friend or a resident has none.
+## the waiting friend or a resident has none.
 func set_held(on: bool, player_color: Color = color) -> void:
 	_held = on
 	color = player_color

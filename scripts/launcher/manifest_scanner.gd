@@ -39,12 +39,35 @@ static func scan(root: String) -> Array[Dictionary]:
 	return out
 
 
+## The jars to show. Off: stable builds only. On: one jar per game, never two (Kaden, playtest
+## 2026-11-12: "Dev mode ... should only show the dev version"): its dev build if one is installed,
+## else its stable build. Order follows `entries` (the first build of each game holds its place).
 static func filter_dev(entries: Array[Dictionary], show_dev: bool) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
+	if not show_dev:
+		for e in entries:
+			if not e.dev:
+				out.append(e)
+		return out
+	var at := {}   # game -> index in out
 	for e in entries:
-		if show_dev or not e.dev:
+		var game := game_of(e)
+		if not at.has(game):
+			at[game] = out.size()
 			out.append(e)
+		elif e.dev and not out[at[game]].dev:
+			out[at[game]] = e
 	return out
+
+
+## Which game an entry is a build of: its slug. CI gives a game's stable and dev builds the same slug
+## (the repo name, installed as `<repo>/` and `<repo>-dev/`); a hand-written dev manifest that kept
+## the folder name as its slug (`smash-party-dev`) still counts as `smash-party`.
+static func game_of(e: Dictionary) -> String:
+	var slug: String = e.get("slug", "")
+	if e.get("dev", false) and slug.ends_with("-dev"):
+		return slug.trim_suffix("-dev")
+	return slug
 
 
 ## One folder's manifest as a normalised entry, or {} (with a warning) if it is unusable.

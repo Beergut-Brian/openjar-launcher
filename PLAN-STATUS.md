@@ -37,6 +37,10 @@ the plan-status lane against the code, the test run and real frames, not against
   the look ruled out as the first-frame cost. Recount: 80 rows: 65 built, 11 superseded, 3 partial, 1 missing.
   `scripts/tools/test.sh` (clean import first; user data, picks and temp jars under `.scratch/`) exits 0: 177 test
   cases, 0 failures, 0 engine errors.
+- **Hub-playtest-1112** (`feature/hub-playtest-1112`, 2026-11-12): Kaden's playtest notes, rows PT1112-1 and
+  PT1112-2 (both built). `scripts/tools/test.sh` (clean import first; user data, picks and temp jars under
+  `.scratch/`) exits 0: 186 test cases, 0 failures, 0 engine errors (`handoff/test-output.txt`). **Totals
+  (recount):** 82 rows: 67 built, 11 superseded, 3 partial, 1 missing.
 - **Status values:** built / partial / missing / superseded / dropped / later (see `~/openjar/lanes/plan-status-format.md`).
 
 Sources (oldest first):
@@ -52,7 +56,7 @@ Sources (oldest first):
 - S5 `~/openjar/CHARACTER-CHOOSER-PLAN-2026-11-10.md`, launcher parts. Kaden: "The launcher should be 'in-line' ...
   It can just be a part of the ready up screen". Also covers the GAME.md "(chooser)" decisions.
 - S6 Kaden chat, 2026-11-10: "when a character is up on the screen, I'd like it to say it's catchphrase once."
-- No playtest reports yet (`playtests/` holds only `_TEMPLATE.md`).
+- S7 `playtests/2026-11-12.md`, Kaden's first playtest notes (the PT1112 rows). Before it, `playtests/` held only `_TEMPLATE.md`.
 - Kaden, 2026-11-10: there is no stick-only requirement any more. No row asked for one (P-04 is "walk
   anywhere", which the D-pad and keys also do), so no row was dropped.
 
@@ -88,7 +92,7 @@ Sources (oldest first):
 
 | ID | Source | Item | Status | Proof | Notes |
 | --- | --- | --- | --- | --- | --- |
-| P-01 | S2 Players | Either pad drives the launcher | built | `project.godot` `launcher_*` actions on device -1; `tests/test_smoke.gd::test_input_map_has_every_player_action` | |
+| P-01 | S2 Players | Either pad drives the launcher | built | `project.godot` `launcher_*` actions on device -1; `tests/test_smoke.gd::test_input_map_has_every_player_action` | PT1112-1: still true for the launcher's own buttons (Start, LB+RB); for walking, each pad now joins on its first press or stick push and drives only its own Jarling. |
 | P-02 | S3, CLAUDE.md | P2 drops in; rings are P1 green and P2 red, whoever you play | built | `tests/test_hub.gd::test_second_player_takes_the_other_jarling_and_rings_are_by_player`; `tests/test_smoke.gd::test_players_colors_are_green_and_red`; frame `walk_p2_chooser/t006.8s.png` | |
 | P-03 | S3 decision | P1 keeps the profile Jarling they picked, P2 gets the other | superseded | `tests/test_hub.gd::test_picks_from_the_shared_file_build_the_jarlings` | Superseded by S5: each player is their own Roster pick. |
 | P-04 | S4 | "I want to be able to run around": walk anywhere, all the way over runs | built | `tests/test_hub.gd::test_every_direction_walks_and_jars_are_solid`, `::test_full_tilt_runs_and_a_small_tilt_walks`, `::test_holding_right_walks_past_the_jars_instead_of_snapping`; `tests/test_hub_layout.gd::test_stick_is_analogue_and_full_tilt_runs` | Analogue walk, run at 7 m/s. Not tried with a real pad. |
@@ -175,6 +179,13 @@ Sources (oldest first):
 | L-05 | Launch brief | README play instructions current | built | `README.md` | Was the template's README. |
 | L-06 | Launch brief | No placeholders in shipped scenes | built | grep in `handoff/REPORT.md` section 4 | Left, by design or for someone else: the logo stand-in (V-01), four silent characters (M-09), `scenes/players/player.tscn` (template file, unused, now kept out of the export). Launch-ready-2, 2026-11-12: the four silent characters are gone from this list (v0.5.3 voices); left: the logo stand-in (V-01) and the unused template player scene. |
 | L-07 | Launch brief (zero script errors) | The test run and a headless session log no engine errors | built | `scripts/hub/jarling.gd` `_set_model` (drops the rim-light override materials before freeing the old body); `tests/test_jarling_swap_clean.gd::test_the_old_body_lets_go_of_its_materials_before_it_goes`; `handoff/test-output.txt` (0 `ERROR` lines) | Launch-ready-2, 2026-11-12: every character swap under the headless renderer logged `Parameter "material" is null` (13 per test run, after the v0.5.x kit); gone. |
+
+## Playtest 2026-11-12 (PT1112)
+
+| ID | Source | Item | Status | Proof | Notes |
+| --- | --- | --- | --- | --- | --- |
+| PT1112-1 | S7 | Kaden: "Players should be able to walk around independently. Right now we're stuck together. Either player can launch a game." | built | `tests/test_playtest_1112.gd::test_two_players_walk_apart_on_opposite_sticks` (2.5 s of opposite sticks: more than 10 m apart, past 4x the old 1.9 m follow reach, and they stay apart), `::test_one_stick_moves_only_its_own_jarling`, `::test_the_jarling_nobody_holds_waits_and_never_tags_along`, `::test_a_stick_push_joins_a_pad_and_p2_is_parked_until_then`, `::test_p2_at_a_jar_presses_a_and_launches_it_and_nobody_is_moved` (P2's A launches `b-game --profile=p2` with both picks; on return P1 has not moved), `::test_p1_launches_too_with_p2_far_away`; headless run and exported build: `HUB_DEMO=follow;0.5:p2;0.6:go2:1;0.6:go:0;1.5:dev;4:a2` gives `launcher: starting .../smash-party-dev/game.sh --profile=p2 --p1-char=jeff --p2-char=chuck`, exit 0, back in the hub, 0 script errors; frames `handoff/shots/pt1112-1-*.png` | What made them stuck: (1) a pad only joined on a button press, so until someone pressed one every pad drove P1's Jarling (`p1_*` on all devices) and the other Jarling tagged along (`HubJarling.follow`); a kid who only pushes the stick never got their own. Now a left-stick push past 0.5 also joins (`Players.joins`), and `p2_*` pad events are parked on no device until P2 has a pad, so P1's stick never also drives P2. (2) After every game the rescan stood both Jarlings back together at the launched jar; now nobody moves and the launcher pops out where it stood. `follow` is gone: the unheld Jarling waits where it is. `scripts/autoload/Players.gd` was changed (Systems lane; the brief listed `scripts/hub/` and `scripts/launcher/`); contract updated first (`docs/contracts.md`, Players and Hub). Not tried with two real pads: TV check. |
+| PT1112-2 | S7 | Kaden: "Dev mode shows multiple versions of the game. It should only show the dev version." | built | `tests/test_manifest_scanner.gd::test_dev_on_shows_one_entry_per_game_dev_first`, `::test_dev_order_does_not_matter_and_a_dev_suffix_slug_is_the_same_game`, `::test_dev_filtering_and_sorted_order` (a dev-only game still shows); `tests/test_playtest_1112.gd::test_dev_view_shows_one_jar_per_game` (hub: stable+dev, stable-only, dev-only, hand-written `-dev` slug; toggled on and back off); frames `handoff/shots/pt1112-2-stable-view.png`, `pt1112-2-dev-view-one-jar-per-game.png` (staged `OPENJAR_ROOT` in `.scratch/games-dev`: `smash-party` + `smash-party-dev`, `ball-bash`: two jars both ways, Smash Party's lid goes dark) | `ManifestScanner.filter_dev`: on = one entry per game (`game_of`: the slug, a dev slug's `-dev` suffix dropped), the dev build if installed, else the stable one, in the stable one's place; off = stable only, as before. CI writes the repo name as the slug for both builds and `openjar-tv/update.sh` installs them as `<repo>/` and `<repo>-dev/`, so the pair always matches. Still session-only (C-07). |
 
 ## Unrecorded: GAME.md contradicts the plan
 
