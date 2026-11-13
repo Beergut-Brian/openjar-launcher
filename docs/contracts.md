@@ -26,6 +26,9 @@ func restart() -> void          # back to a fresh round, no questions asked
 ### `Players` (`scripts/autoload/Players.gd`)
 
 Who is holding which controller. Never read device ids directly.
+A pad joins (first one P1, next one P2, `player_joined`) on its first button press **or** its first
+left-stick tilt past `JOIN_TILT` (0.5): a kid who only pushes the stick still gets their own player
+(launcher playtest 2026-11-12, "Players should be able to walk around independently").
 
 ```gdscript
 const P1 := 0
@@ -202,7 +205,7 @@ All paths are relative to the manifest's folder.
 | `jar` | string | no | the game's own tiny 3D world, shown inside its jar: a `.glb` / `.gltf` or a self-contained `.tscn` (see "Jar world" below). Missing or unusable → the generated fallback world |
 | `grid` | string | no | 600x900 poster. Only used when there is no `jar`: its average colour tints the fallback world and it hangs as a small backdrop at the back of the jar |
 | `hero`, `clip` | string | no | 920x430 banner / looping clip (not used yet) |
-| `dev` | bool | no (default `false`) | only shown when the dev toggle is on; the jar gets a dark lid with a beacon |
+| `dev` | bool | no (default `false`) | only shown when the dev toggle is on, and then **instead of** that game's stable build: one jar per game (same `slug`; a dev slug ending `-dev` counts as the game without it), its dev build if installed, else its stable one (playtest 2026-11-12); the jar gets a dark lid with a beacon |
 
 A manifest that is not valid JSON, is not an object, has neither a usable `binary` nor
 `command`, or points at a missing `binary`, is skipped with a warning. The launcher never crashes
@@ -306,11 +309,15 @@ Input: the stick walks freely (see GAME.md "Controls"). A at a jar launches it w
 the Jarling that jumps in. B in solo play swaps profile (saved at once): you stay where you are and
 become that profile's P1 pick. Select / Back on your own pad (keys: Tab for P1, `/` for P2) changes
 your character in place: next in roster order; with two players the other's pick is skipped
-(nobody free: a head shake); solo, landing on the tag-along's character trades with it. Ignored
+(nobody free: a head shake); solo, landing on the waiting friend's character trades with it. Ignored
 during the launch sequence and mid-swap. The pick is written to the shared file at once, and the
 hub re-reads that file when a game exits. Start quits.
 With two players, player 1 (green ring) keeps the picked Jarling and player 2 (red ring) holds the
-other one. Holding LB+RB for 1 s toggles dev entries. `GameSpot` API used by the hub:
+other one. Each walks on its own player's stick only: no tag-along, tether or shared centre, and
+either player's A at a jar launches it (both picks are passed as always). The Jarling nobody holds
+yet stands still where it is. Coming back from a game, or toggling dev, nobody is moved; the one who
+jumped in pops back out where it stood (playtest 2026-11-12). Holding LB+RB for 1 s toggles dev
+entries (one jar per game, see `dev` above). `GameSpot` API used by the hub:
 `setup(entry, index, world_kind)`, `place(position, stand_point)`, `set_highlighted(on, color)`,
 `bounce()`, `wobble()`, `launch_pose(t, lid_target)`, `drop_lid()`, `mouth_position()`,
 `inside_position()`, `var empty`, `var custom_world` (true when the game's own `jar` loaded),
