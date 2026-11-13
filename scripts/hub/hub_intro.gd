@@ -60,17 +60,17 @@ func start(who: Array[String]) -> void:
 		v.bus = "SFX" if AudioServer.get_bus_index("SFX") != -1 else "Master"
 		add_child(v)
 		_voices.append(v)
+	# K-07: the bodies load on worker threads and each is built just before it tumbles out, so
+	# the first frame (and A to skip) never waits on the whole roster's glTF.
 	for i in n:
-		var scene := load(str(Roster.info(ids[i]).glb)) as PackedScene
+		var glb := str(Roster.info(ids[i]).glb)
+		if glb != "" and not ResourceLoader.has_cached(glb):
+			ResourceLoader.load_threaded_request(glb, "PackedScene")
 		var holder := Node3D.new()
 		add_child(holder)
-		var body: Node3D = scene.instantiate() if scene else Node3D.new()
-		body.scale = Vector3.ONE * CHARACTER_SIZE
-		holder.add_child(body)
 		holder.visible = false
 		_chars.append(holder)
 		_land_at.append(INF)
-		_play_anim(holder, "idle")
 	_events = [[0.0, "rattle", -1], [IntroPlan.T_POP, "pop", -1],
 		[IntroPlan.thump_time(n), "thump", -1], [IntroPlan.end_time(n) - IntroPlan.OUTRO, "lid", -1],
 		[IntroPlan.end_time(n), "end", -1]]
@@ -113,6 +113,31 @@ func advance(delta: float) -> void:
 		_pose()
 
 
+## Character i's body, built on first use: from its threaded load (waits only if that one isn't in
+## yet) or the cache. Its holder stays empty if the glTF is gone.
+func body(i: int) -> Node3D:
+	var holder := _chars[i]
+	if holder.get_child_count() > 0:
+		return holder
+	var glb := str(Roster.info(ids[i]).glb)
+	var scene: PackedScene = null
+	if glb != "":
+		if ResourceLoader.load_threaded_get_status(glb) != ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+			scene = ResourceLoader.load_threaded_get(glb) as PackedScene
+		else:
+			scene = load(glb) as PackedScene
+	var b: Node3D = scene.instantiate() if scene else Node3D.new()
+	b.scale = Vector3.ONE * CHARACTER_SIZE
+	holder.add_child(b)
+	_play_anim(holder, "idle")
+	return holder
+
+
+## How many bodies are built so far (tests).
+func bodies_built() -> int:
+	return _chars.filter(func(c: Node3D) -> bool: return c.get_child_count() > 0).size()
+
+
 func _beat(kind: String, i: int) -> void:
 	match kind:
 		"rattle":
@@ -124,7 +149,7 @@ func _beat(kind: String, i: int) -> void:
 			landed += 1
 			_land_at[i] = t
 			HubJarling.poof(self, _spots[i] + Vector3(0, 0.2, 0))
-			_play_anim(_chars[i], "cheer")
+			_play_anim(body(i), "cheer")
 			if not _say(i):
 				Audio.play("ui_move")   # no voice (yet) for this one: a landing tick, never silent
 		"thump":
@@ -132,7 +157,8 @@ func _beat(kind: String, i: int) -> void:
 			shake_at = t   # the camera feels it land (IntroPlan.shake), only here: never the chooser or a launch
 			Audio.music("card_row_loop")
 			for c in _chars:
-				_play_anim(c, "cheer")
+				if c.get_child_count() > 0:
+					_play_anim(c, "cheer")
 		"lid":
 			Audio.play("lid_bonk")
 		"end":
@@ -223,6 +249,8 @@ func _pose() -> void:
 		var back := P.back_time(i, n)
 		var to := _spots[i]
 		c.visible = t >= go and t < back + P.BACK_FLIGHT
+		if t >= go - P.FLIGHT:   # built a beat before it leaps, never all at once
+			body(i)
 		if not c.visible:
 			continue
 		var face := atan2(cam.x - to.x, cam.z - to.z)

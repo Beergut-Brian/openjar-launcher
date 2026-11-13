@@ -197,6 +197,23 @@ func test_landing_barks_go_through_the_chooser_voice_call_and_keep_their_cap() -
 	assert_int(intro.voiced.size()).is_equal(before)
 
 
+## K-07: start() builds no bodies (their glTF loads on worker threads), so the first frame never waits
+## on the roster; each is built a flight before it leaps, and every one is in before it is seen.
+func test_bodies_are_built_one_by_one_as_they_leap_not_before_the_first_frame() -> void:
+	var cast := HubIntro.cast()
+	var intro := _intro(cast)
+	assert_int(intro.bodies_built()).is_equal(0)
+	intro.advance(0.01)
+	assert_int(intro.bodies_built()).is_less(cast.size())
+	var n := cast.size()
+	while intro.t < IntroPlan.land_time(n - 1, n):
+		intro.advance(0.05)
+		for i in n:
+			if intro._chars[i].visible:
+				assert_int(intro._chars[i].get_child_count()).is_equal(1)
+	assert_int(intro.bodies_built()).is_equal(n)
+
+
 func test_skip_ends_it_at_once() -> void:
 	var intro := _intro(HubIntro.cast())
 	intro.advance(1.2)
