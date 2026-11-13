@@ -102,6 +102,9 @@ var _quitting := false
 var _demo_quit_until := 0.0
 var quit_meter: QuitMeter
 var version_label: Label
+var refusals := 0                       # refusal boops so far (tests read it)
+var _refused_frame := -1
+var _bound_cache: Array[int] = []
 var really_quit := true                  # tests turn this off to see the hold without quitting
 var _intro := 0.0
 var _intro_hold := false
@@ -496,10 +499,16 @@ func _process(delta: float) -> void:
 			if Input.is_action_just_pressed(Players.action(p, "action")):
 				intro.skip()
 				break
+			if _pressed_now(p, false):
+				refuse()   # B or the chooser while the intro plays: only A skips it, and says so
 	elif screen == Screen.HUB and not launch.active and Time.get_ticks_msec() >= _input_from_ms:
 		_read_players()
 		if _dev_combo.update(Input.is_action_pressed("launcher_lb"), Input.is_action_pressed("launcher_rb"), delta):
 			_toggle_dev()
+	elif screen == Screen.HUB and launch.active:
+		for p: int in [Players.P1, Players.P2]:
+			if _pressed_now(p):
+				refuse()   # a launch is playing: A, B and the chooser wait, and say so
 	for i in jarlings.size():
 		var j := jarlings[i]
 		j.hint_enabled = screen == Screen.HUB and not launch.active and j.is_held()
@@ -533,6 +542,8 @@ func _read_players() -> void:
 		if _demo_goal[player] >= 0:
 			v = _demo_steer(player, j)
 		if j.busy:
+			if change or _pressed_now(player, true, false):
+				refuse()   # mid-jump or mid-swap: the press is heard as a "not now"
 			continue
 		j.move_input = v
 		if Input.is_action_just_pressed(Players.action(player, "action")):
@@ -545,6 +556,60 @@ func _read_players() -> void:
 				pick_profile(LaunchArgs.PROFILES[1 - index_of_profile(profile)])
 		if change:
 			change_character(player)
+
+
+## Did `player` just press A or B (and, with `change`, the chooser button)? `change` reads the
+## chooser's edge, so pass false when the caller already read it this frame.
+func _pressed_now(player: int, with_action: bool = true, change: bool = true) -> bool:
+	var hit := with_action and Input.is_action_just_pressed(Players.action(player, "action"))
+	hit = Input.is_action_just_pressed(Players.action(player, "jump")) or hit
+	if change:
+		hit = _change_just_pressed(player) or hit
+	return hit
+
+
+## A press that does nothing says so: the launcher's "can't do that" boop (ui_back, CUES.md).
+## At most once a frame, however many buttons were mashed together.
+func refuse() -> void:
+	var frame := Engine.get_process_frames()
+	if frame == _refused_frame:
+		return
+	_refused_frame = frame
+	refusals += 1
+	Audio.play("ui_back")
+
+
+## Pad buttons and keys that no hub action uses (X, Y, the stick clicks, a stray key) still answer
+## with the refusal boop while the hub is on screen, so no button is ever silent. Guide is left to
+## Steam. LB / RB alone tick like Start does: they are half of the dev hold.
+func _input(event: InputEvent) -> void:
+	if screen != Screen.HUB or _quitting or not event.is_pressed() or event.is_echo():
+		return
+	if event is InputEventJoypadButton:
+		var b: int = event.button_index
+		if b == JOY_BUTTON_GUIDE or b == CHANGE_BUTTON or b in _bound_buttons():
+			if b in [JOY_BUTTON_LEFT_SHOULDER, JOY_BUTTON_RIGHT_SHOULDER]:
+				Audio.play("ui_move")
+			return
+		refuse()
+	elif event is InputEventKey:
+		for a in InputMap.get_actions():
+			if not str(a).begins_with("ui_") and InputMap.event_is_action(event, a, true):
+				return
+		refuse()
+
+
+## Every joypad button some action in the input map uses (any device). Godot's built-in ui_* actions
+## do not count: the hub never reads them.
+func _bound_buttons() -> Array[int]:
+	if _bound_cache.is_empty():
+		for a in InputMap.get_actions():
+			if str(a).begins_with("ui_"):
+				continue
+			for ev in InputMap.action_get_events(a):
+				if ev is InputEventJoypadButton and not ev.button_index in _bound_cache:
+					_bound_cache.append(ev.button_index)
+	return _bound_cache
 
 
 ## Edge of the change button for `player`: their key, or Back on their own pad (read by device, so
@@ -565,7 +630,10 @@ func _change_just_pressed(player: int) -> bool:
 ## the launch (and while that Jarling is mid-jump or mid-swap). True if the character changed.
 func change_character(player: int) -> bool:
 	var j := jarling_for(player)
-	if j == null or j.busy or j.swapping or launch.active or screen != Screen.HUB:
+	if j == null or screen != Screen.HUB:
+		return false
+	if j.busy or j.swapping or launch.active:
+		refuse()   # mid-swap (or mid-jump, or launching): "not now", never silence
 		return false
 	var now := Roster.pick(player)
 	var to := Roster.next_free(player, 1)
