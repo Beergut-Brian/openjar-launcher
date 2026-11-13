@@ -174,7 +174,7 @@ func test_a_whole_session_never_softlocks() -> void:
 	# P2 drops out: back to tagging along, and solo B swaps the profile
 	hub._on_player_left(Players.P2)
 	assert_bool(hub.two_players).is_false()
-	assert_object(hub.jarlings[1].follow).is_same(hub.jarlings[0])
+	assert_bool(hub.jarlings[1].is_held()).is_false()   # waits where it is, never tags along
 	await _wait(0.6)
 	hub.pick_profile("p2")
 	assert_str(hub.profile).is_equal("p2")
@@ -230,7 +230,7 @@ func test_p2_dropping_out_is_heard_and_seen() -> void:
 	assert_bool(hub.two_players).is_false()
 	assert_str(Audio.last_cue).is_equal(hub.LEAVE_SOUND)
 	assert_bool(ResourceLoader.exists("res://assets/audio/sfx/%s.ogg" % hub.LEAVE_SOUND)).is_true()
-	assert_object(p2.follow).is_same(hub.lead_jarling())
+	assert_bool(p2.is_held()).is_false()   # waits where it is, never tags along
 	assert_bool(p2._shape_tween != null and p2._shape_tween.is_valid()).is_true()   # the hop
 
 

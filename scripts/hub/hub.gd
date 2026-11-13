@@ -333,14 +333,16 @@ func quit_to_steam() -> void:
 
 # ---------------------------------------------------------------- jars
 
-func _rescan(select_slug: String) -> void:
+func _rescan(select_slug: String, keep_places: bool = false) -> void:
 	all_entries = ManifestScanner.scan(root_dir)
 	print("launcher: %d entries in %s" % [all_entries.size(), root_dir])
-	set_entries(ManifestScanner.filter_dev(all_entries, LauncherState.show_dev(Save)), select_slug)
+	set_entries(ManifestScanner.filter_dev(all_entries, LauncherState.show_dev(Save)), select_slug, keep_places)
 
 
 ## Rebuilds the row of jars and stands the Jarlings at `select_slug`'s jar (the middle one if unknown).
-func set_entries(list: Array[Dictionary], select_slug: String = "") -> void:
+## keep_places: everyone stays where they stand (back from a game, the dev toggle), only nudged out of
+## any jar that moved; nobody is pulled over to anyone else (playtest 2026-11-12).
+func set_entries(list: Array[Dictionary], select_slug: String = "", keep_places: bool = false) -> void:
 	launch.cancel()
 	for s in spots:
 		spot_root.remove_child(s)
@@ -360,11 +362,15 @@ func set_entries(list: Array[Dictionary], select_slug: String = "") -> void:
 			selected = i
 	var lead := lead_jarling()
 	var stand := HubLayout.stand_position(selected, count)
-	lead.position = stand
-	lead.rotation.y = PI
-	var other := jarlings[1 - jarlings.find(lead)]
-	other.position = stand + Vector3(1.7 if stand.x <= 0.0 else -1.7, 0, 1.3)
-	other.rotation.y = PI
+	if keep_places:
+		for j in jarlings:
+			j.position = HubLayout.walkable(j.position, count)
+	else:
+		lead.position = stand
+		lead.rotation.y = PI
+		var other := jarlings[1 - jarlings.find(lead)]
+		other.position = stand + Vector3(1.7 if stand.x <= 0.0 else -1.7, 0, 1.3)
+		other.rotation.y = PI
 	for j in jarlings:
 		j.jar_count = count
 		j.stop()
@@ -388,7 +394,8 @@ func lead_jarling() -> HubJarling:
 	return jarlings[index_of_profile(profile)]
 
 
-## Player 1 holds the picked Jarling. The other one tags along until player 2 joins and takes it.
+## Player 1 holds the picked Jarling. The other one waits where it stands until player 2 joins and
+## takes it; from then on each walks on its own player's stick only.
 func jarling_for(player: int) -> HubJarling:
 	if player == Players.P1:
 		return lead_jarling()
@@ -400,7 +407,6 @@ func _apply_roles() -> void:
 	var lead := lead_jarling()
 	for j in jarlings:
 		var held := two_players or j == lead
-		j.follow = null if held else lead
 		j.set_held(held, Players.COLOR[Players.P1 if j == lead else Players.P2])
 		if not held:
 			j.move_input = Vector2.ZERO
@@ -413,7 +419,7 @@ func _on_player_joined(player: int, _device: int) -> void:
 		join_second_player()
 
 
-## P2's pad goes away (unplugged, out of battery): their Jarling goes back to tagging along, with a
+## P2's pad goes away (unplugged, out of battery): their Jarling stands and waits where it is, with a
 ## little "bye" (a sound and a hop), so dropping out is never silent.
 func _on_player_left(player: int) -> void:
 	if player == Players.P2 and two_players:
@@ -482,7 +488,7 @@ func _process(delta: float) -> void:
 		if _dev_combo.update(Input.is_action_pressed("launcher_lb"), Input.is_action_pressed("launcher_rb"), delta):
 			_toggle_dev()
 	for j in jarlings:
-		j.hint_enabled = screen == Screen.HUB and not launch.active and j.follow == null
+		j.hint_enabled = screen == Screen.HUB and not launch.active and j.is_held()
 	if launch.active:
 		for beat in launch.advance(delta):
 			_on_launch_beat(beat)
@@ -699,7 +705,7 @@ func _update_focus(silent: bool = false) -> void:
 	for i in jarlings.size():
 		var j := jarlings[i]
 		var f := -1
-		if j.follow == null:
+		if j.is_held():
 			# mid-jump (into or out of a jar) a Jarling keeps the jar it was at
 			f = focus[i] if j.busy and focus[i] >= 0 else HubLayout.focus_at(j.position, spots.size(), focus[i])
 		if f != focus[i]:
@@ -723,7 +729,7 @@ func _toggle_dev() -> void:
 	Save.flush()
 	Audio.play("ui_toggle")
 	var keep: String = selected_entry().get("slug", "")
-	set_entries(ManifestScanner.filter_dev(all_entries, on), keep)
+	set_entries(ManifestScanner.filter_dev(all_entries, on), keep, true)
 	for s in spots:
 		if s.entry.get("dev", false):
 			s.bounce()
@@ -835,7 +841,7 @@ func _on_process_watch() -> void:
 	_quit_needs_release = true   # Start may still be down (the home hold, a game's own quit)
 	Roster.reload()           # a pick changed inside the game shows up here
 	apply_characters()
-	_rescan(_running_slug)   # pick up games installed or updated meanwhile
+	_rescan(_running_slug, true)   # pick up games installed or updated meanwhile; nobody moves
 	_set_screen(Screen.HUB)
 	_input_from_ms = Time.get_ticks_msec() + RETURN_GRACE_MS
 	_play_return(jarlings[_launcher_index])
@@ -848,16 +854,27 @@ func _play_return(j: HubJarling) -> void:
 	create_tween().tween_property(_flash, "color:a", 0.0, 0.35)
 	for other in jarlings:
 		other.set_expression("neutral")
-	var f := HubLayout.focus_at(lead_jarling().position, spots.size())
-	if f < 0 and _launch_spot != null and is_instance_valid(_launch_spot):
+	# The jar it jumped into (the row may have been rebuilt meanwhile: found again by slug). Whoever
+	# launched (P1 or P2) pops back out where they stood; the other player is never moved.
+	var f := -1
+	if _launch_spot != null and is_instance_valid(_launch_spot):
 		f = spots.find(_launch_spot)
+	if f < 0:
+		for i in spots.size():
+			if not _running_slug.is_empty() and spots[i].entry.get("slug", "") == _running_slug:
+				f = i
+	if f < 0:
+		f = HubLayout.focus_at(j.position if _launch_from == Vector3.ZERO else _launch_from, spots.size())
 	if f >= 0:
 		var spot := spots[f]
 		Audio.play("jar_pop_out")
 		shout(j, RETURN_BARKS)   # "I'm back!"
 		spot.splash()
 		spot.drop_lid(0.5)
-		j.jump_out(spot.mouth_position(), spot.stand_point if j == lead_jarling() else _launch_from)
+		var stand := _launch_from
+		if stand == Vector3.ZERO or HubLayout.focus_at(stand, spots.size()) != f:
+			stand = spot.stand_point   # the row changed under it: in front of its jar
+		j.jump_out(spot.mouth_position(), HubLayout.walkable(stand, spots.size()))
 	else:
 		j.jump_out(j.global_position, j.global_position)
 
@@ -956,7 +973,7 @@ func _update_camera(delta: float) -> void:
 	var spread := 0.0
 	var held := 0
 	for j in jarlings:
-		if j.follow == null:
+		if j.is_held():
 			centre += Vector3(j.position.x, 0, j.position.z)
 			held += 1
 	centre /= maxf(held, 1)
@@ -1114,6 +1131,7 @@ func _run_demo() -> void:
 				_apply_roles()
 				set_entries(entries, LauncherState.last_card(Save))
 			"a": press_action(Players.P1)
+			"a2": press_action(Players.P2)
 			"slow": Engine.time_scale = float(d[2])   # slow motion, for frame strips of the launch
 			"return":   # the return animation without running a game
 				jarlings[_launcher_index].visible = false

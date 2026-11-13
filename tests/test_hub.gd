@@ -376,7 +376,7 @@ func test_launch_hand_off_return_and_profile_pick() -> void:
 	assert_str(hub.profile).is_equal("p2")
 	assert_str(LauncherState.profile(Save)).is_equal("p2")
 	assert_object(hub.lead_jarling()).is_same(hub.jarlings[1])
-	assert_object(hub.jarlings[0].follow).is_same(hub.jarlings[1])
+	assert_bool(hub.jarlings[0].is_held()).is_false()
 	await _wait(0.2)
 	_walk_to_jar(hub, 1)                               # the kid walks up to the same jar
 	await _tap("p1_action")
@@ -477,8 +477,8 @@ func test_second_player_takes_the_other_jarling_and_rings_are_by_player() -> voi
 	assert_object(hub.jarling_for(Players.P2)).is_same(hub.jarlings[0])
 	assert_that(hub.jarlings[1].color).is_equal(Players.COLOR[Players.P1])
 	assert_that(hub.jarlings[0].color).is_equal(Players.COLOR[Players.P2])
-	assert_object(hub.jarlings[0].follow).is_null()
-	assert_object(hub.jarlings[1].follow).is_null()
+	assert_bool(hub.jarlings[0].is_held()).is_true()
+	assert_bool(hub.jarlings[1].is_held()).is_true()
 	hub.pick_profile("p1")                            # no swapping once both are held
 	assert_str(hub.profile).is_equal("p2")
 
