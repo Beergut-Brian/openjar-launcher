@@ -161,6 +161,29 @@ installed (Smash Party via its kiosk shortcut counts), launches one, comes back.
   release.yml) sits small and faint in the bottom-right corner, for grown-ups; local builds say
   `v0.0.0-local`. The dev builds' lid is charcoal and nearly matte, so it reads dark in the sunset.
 
+## Playtest 2026-11-12 changes (Kaden; these supersede the sections above)
+Kaden: "Players should be able to walk around independently. Right now we're stuck together. Either
+player can launch a game." and "Dev mode shows multiple versions of the game. It should only show the
+dev version." (`playtests/2026-11-12.md`)
+
+- **Each player walks on their own.** Every pad is its own player the moment it does anything: its
+  first button press **or its first stick push** joins it (first pad P1 green, next P2 red). A kid who
+  only ever pushes the stick still gets their own Jarling; two pads never drive the same one. Each
+  Jarling moves on its own player's stick only: no tag-along, tether, leash or shared centre. The
+  camera frames both wherever they are (it pulls back, it never pulls them in).
+- **Nobody is pulled over.** Coming back from a game, the one who jumped in pops back out where they
+  stood; the other player is never moved. The dev toggle moves nobody either.
+- **Either player launches.** Whoever walks up to a jar and presses A jumps in and launches it, P1 or
+  P2; the game gets that Jarling's profile and both players' picks, as before.
+- **The Jarling nobody holds yet** (solo play, or P2's pad went away) stands and waits where it is,
+  with no ring. It never follows, drags or blocks the active player. This replaces "tags along" in the
+  Controls table and the decisions above; solo B (profile swap) and Select (trade with the waiting
+  friend) work as before.
+- **Dev view: one jar per game.** With LB+RB held 1 s, each game shows exactly one jar: its dev build
+  (dark lid) if one is installed, else its stable build. Never two jars for the same game. A game is
+  known by its manifest `slug` (CI gives both builds the repo name; a hand-written dev slug ending
+  `-dev` counts as the same game). The toggle still lasts for one launcher run only.
+
 ## Open questions
 - Logo and jar design: Kaden approves the Art lane's three options.
 - Should the intro play every boot or only the first boot of the day? Proposal: first boot of the day, skippable always.
