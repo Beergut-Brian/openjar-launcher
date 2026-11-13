@@ -1,79 +1,69 @@
-# Report: launcher-rules-audit-1 (Feel-rules audit lane)
+# Report: launcher-fr3-1 (Join-and-ready gap lane)
 
-Branch `fix/launcher-rules-audit-1` (off `dev` at `a1519fb`; `git merge origin/dev`: already up to date).
-Not pushed. Status: **done**. Audits Kaden's standing game-feel rules (2026-11-13, as audited on Worm)
-against the launcher hub on `dev`, and fixes the one that failed (FR-4: silent presses).
+Branch `feature/launcher-fr3-1` (off `dev`; `git merge origin/dev`: already up to date). Not pushed.
+Status: **done, FR-3 stays partial** (two paths need a gameplay decision, below). No game code changed.
 
-## Rules table
+## FR-3 audit: each path
 
-| # | Rule | Before (dev at a1519fb) | Now | Where |
-| --- | --- | --- | --- | --- |
-| 1 | The D-pad moves the hub character, the same as the stick | **Pass.** D-pad buttons are already in `project.godot`'s `p1_/p2_move_*` (PF-3); `hub.gd` `_read_players` walks on `Players.move_vector`. Only P1's slot had a test. | Pass, both pad slots tested | `tests/test_hub_dpad.gd` (new, real pad events: P1 slot, P2 slot, each direction); frames `handoff/frames/rules_dpad_*.jpg` |
-| 2 | No forced movement and no snap in the hub; walk up to a jar to focus it, A uses it; no hop-to-next on stick or D-pad | **Pass.** `HubJarling.stick_velocity` is the raw stick; focus is `HubLayout.focus_at` (position only); the only steering is the `HUB_DEMO go:` script | Pass, now also pinned for the D-pad | `tests/test_hub_dpad.gd::test_dpad_held_walks_past_a_jar_instead_of_hopping_to_it`, `tests/test_hub.gd::test_holding_right_walks_past_the_jars_instead_of_snapping` |
-| 3 | Both players join and ready up with A and the keyboard; the chooser in the join/ready step works with the D-pad | **Pass for join/ready** (any pad button or a stick push joins, P2's keys join, A at a jar launches for either player). **D-pad chooser: no.** There is no separate join/ready step: the chooser is in-line in the walkable hub (Select / Tab / slash), where the D-pad walks | Join/ready tested for pad A and P2's keys; D-pad chooser left for a decision (it would break rule 2) | `tests/test_hub_feel_rules.gd::test_p2_joins_with_a_on_a_second_pad`, `::test_p2_joins_from_the_keyboard`; "Needs a gameplay decision" below |
-| 4 | Every action beeps; a press with no effect plays a refusal sound | **Fail.** Silent: A / B / the chooser while the Jarling is mid-jump or mid-swap, or while a launch plays; B and the chooser during the intro; X, Y, the stick clicks and stray keys (no action at all); LB or RB alone | **Fixed.** `hub.gd` `refuse()` plays `ui_back` (the "can't do that" cue, `assets/audio/CUES.md`), at most once a frame. `_input` catches buttons and keys no hub action uses (Godot's `ui_*` don't count; Guide is left to Steam). LB / RB alone tick `ui_move` like Start (half of a hold). | `scripts/hub/hub.gd` (`refuse`, `_pressed_now`, `_input`, `_bound_buttons`, `_process`, `_read_players`, `change_character`); `tests/test_hub_feel_rules.gd` (5 refusal tests) |
-| 5 | The hub hint changes with context, with controller glyphs | **Pass.** At a jar with a game: A + "into the jar" over the head; the Select chooser hint by the ring after standing still; keyboard glyphs (Space/Enter, Tab/slash) with no pad; nothing at the empty jar | Pass (no change) | `tests/test_player_flow.gd::test_a_jar_in_focus_shows_the_jump_in_button`, `::test_the_jump_in_button_follows_the_players_pad_or_key`, `::test_the_empty_jar_never_offers_jump_in`; frames `rules_dpad_03_after_walked_to_jar_a_and_select_hints.jpg` (pad glyphs), `rules_quit_start_held_badge_filling.jpg` (key glyphs) |
-| 6 | Quitting never needs a force-close, from the hub and from the menu | **Pass.** Start (pad) or Escape (keys) held 1.5 s quits, a tap never does; the window's close button goes through `Audio.quit`. The launcher has **no menu** (`pause` does nothing outside a round in `Game.gd`), so the menu half has nothing to check. Escape had no test. | Pass, Escape-hold now tested | `tests/test_quit_hold.gd`, `tests/test_hub_feel_rules.gd::test_escape_held_quits_and_a_tap_does_not`, `tests/test_audio_release.gd::test_close_button_goes_through_audio_quit`; frame `rules_quit_start_held_badge_filling.jpg` |
-| 7 | Solo and start-fresh | **N/A.** The launcher keeps no game progress: `Save` holds only `LauncherState` (the last jar, the profile; the dev view is session-only). Solo is per game (`Players.gd` in each game). | N/A, nothing added | `scripts/launcher/launcher_state.gd` |
+| Path | In the code | Test (all in `tests/test_hub_feel_rules.gd` unless named) | State |
+| --- | --- | --- | --- |
+| Join with A on a second pad | `Players.gd` claims the pad, `hub.gd` `_on_player_joined` → `join_second_player` | `test_p2_joins_with_a_on_a_second_pad` | built |
+| Join from the keyboard (P2 keys) | `hub.gd` `_read_players`: any P2 key with no P2 joins | `test_p2_joins_from_the_keyboard` | built |
+| Join with the D-pad | any pad press claims the pad (PF-3) | `tests/test_player_flow.gd::test_a_dpad_press_joins_and_walks_player_one` | built |
+| The press that joins never also launches | the joining event lands before P2's action is bound to that pad | `test_p2_joined_on_a_pad_gets_its_own_select_and_a_hints`, `test_p2_joined_from_the_keyboard_gets_the_slash_and_enter_hints` (new: P2 waits at a jar in the fixture) | built, newly tested |
+| Hint follows the join | `_update_hints` on join: P2's ring gets Select + A (pad) or `/` + Enter (keys) in red | the same two new tests | built, newly tested |
+| P2's chooser on their own pad | `_change_just_pressed` reads Back per device | `test_p2_changes_character_with_select_on_their_own_pad_only` (new; P1's pick does not change) | built, newly tested |
+| Ready with A | A at a jar launches, for P1 or P2 | `tests/test_playtest_1112.gd::test_p2_at_a_jar_presses_a_and_launches_it_and_nobody_is_moved`, `::test_p1_launches_too_with_p2_far_away` | built |
+| Chooser left / right on the D-pad | **not built.** In the hub the D-pad walks (FR-1); Select / Tab / `/` cycles | `test_the_dpad_left_and_right_walk_and_never_change_the_character` (new: pins today's behaviour) | partial |
+| Un-ready with B | **not built.** There is no ready state: A at a jar launches straight away; B during the launch is a refusal boop (FR-4) | — | partial |
 
-## Commits
+The brief expected the gap to be a missing D-pad binding on a join/ready chooser (the template's `docs/ui.md` fix). It
+is not that: the D-pad bindings are all in `project.godot` (`tests/test_player_flow.gd::test_every_move_action_has_its_dpad_button`),
+and the launcher has no join/ready step at all. Joining happens in the walkable hub and the chooser lives on your
+Jarling (GAME.md, 2026-11-10 chooser: "the hub has no ready screen, so the chooser lives on your Jarling").
 
-- `1d324a1 hub: every ignored press answers with the refusal boop` (`scripts/hub/hub.gd`, `tests/test_hub_feel_rules.gd`)
-- `14f5592 tests: the D-pad walks the hub character on both pad slots` (`tests/test_hub_dpad.gd`)
-- `bd1834d docs: PLAN-STATUS S8 feel rules, FR-1 to FR-7 (rules-audit-1)` (`PLAN-STATUS.md`, `REPORT.md`)
+## Needs a gameplay decision (Hermes / Kaden)
 
-No change to `project.godot`, `addons/openjar/`, art, audio or store files.
+FR-3's remaining two paths both need a join/ready step that the hub does not have. Adding the D-pad to the chooser in
+the hub would take away D-pad walking, which FR-1 and FR-2 require (and the brief says not to change the stick). The
+choices are the same as in the rules-audit-1 report:
+- (a) Keep it as it is. The D-pad walks and Select changes the character. Mark FR-3's D-pad chooser and un-ready rows
+  as superseded by FR-1. **Recommended:** a 5-year-old already joins with any button and launches with A.
+- (b) Add a short ready-up moment when P2 joins (or before a launch) where the D-pad cycles characters, A means
+  ready and B means un-ready. That is a new screen and a change to GAME.md, so it is not this lane's call.
 
 ## Tests
 
-Clean import first (`rm -rf .godot && godot --headless --import --path .`), then `scripts/tools/test.sh`
-(the full suite with `--continue`; user data, the tests' picks files and temp jars under `.scratch/`, never
-the real `players.json`). The new suites use their own Save profiles and picks files
-(`user://test_hub_dpad/players.json`, `user://test_hub_feel_rules/players.json`).
+`rm -rf .godot && godot --headless --import --path .`, then `scripts/tools/test.sh` (the gdUnit4 command with
+`--continue`, every user path in `.scratch/`): exits 0.
+`Overall Summary: 213 test cases | 0 errors | 0 failures | 0 flaky | 0 skipped | 0 orphans |` (`handoff/test-output.txt`).
+The new tests use the suite's own throwaway picks file (`user://test_hub_feel_rules/players.json`) and Save profile.
+One test uses `tests/fixtures/roster_three.json` so a two-player Select has a free character.
 
-**Exit 0.** `Overall Summary: 209 test cases | 0 errors | 0 failures | 0 flaky | 0 skipped | 0 orphans |` (198 before this lane), 0 engine errors. Log: `handoff/test-output.txt`.
+## Frames (real, Forward+ on llvmpipe, 1920x1080)
 
-New: 11 test cases (`test_hub_dpad.gd` 3, `test_hub_feel_rules.gd` 8).
+`HUB_DEMO="follow;1.0:btn:0:12:1;1.1:btn:0:12:0;1.6:btn:1:0:1;1.7:btn:1:0:0;2.6:btn:1:14:1;3.6:btn:1:14:0"`
+(pad 0 D-pad down = P1, pad 1 A = P2 joins, pad 1 D-pad right held for 1 s). These are real pad events.
+- `handoff/frames/fr3_01_p2_joined_with_a_on_pad_two.png` (2.3 s): the yellow Jarling with its green ring stands at
+  the jar. Next to it, P2's character (the cap-and-hoodie kid) has a red ring and is cheering with both arms up, just
+  after joining. No hint glyphs yet.
+- `handoff/frames/fr3_02_p2_dpad_right_walked_select_hints_both.png` (6.0 s): P2 has walked well to the right on the
+  D-pad and stands near the island edge. Its character is the same, because the D-pad did not cycle it. Both players
+  show the chooser hint on the floor by their rings, in their own colours: the Select button glyph and a green swap
+  icon for P1, a red one for P2. I did not see an A "into the jar" hint over P1's jar. The shot used this box's real
+  games root, not a fixture, so that jar is probably the empty one, which never offers A.
 
-## Frames (`handoff/frames/`)
+There is no frame of "a D-pad chooser change" because that path does not exist (see above). The second frame shows
+what the D-pad does on this step instead.
 
-Real Forward+ frames (`scripts/tools/shots.sh`, software GPU), `OPENJAR_ROOT=tests/fixtures/hub_8`, user data in
-`.scratch/xdg-shots` (no real save or picks file touched), downscaled to 960x540.
+## Commits
 
-- `rules_dpad_01_before_p1_at_start_jar.jpg`, `rules_dpad_02_dpad_right_held_walking.jpg`,
-  `rules_dpad_03_after_walked_to_jar_a_and_select_hints.jpg`: `HUB_DEMO="follow;1.2:btn:0:14:1;2.4:btn:0:14:0"`
-  (a real D-pad-right press on pad 0, shots at 1, 2, 4.5 s). P1 walks from the middle jar to a jar on the right,
-  which comes into focus with the A + into-the-jar hint and the Select chooser hint; P2's Jarling waits.
-- `rules_quit_start_held_badge_filling.jpg`: `HUB_DEMO="follow;1:holdstart:1.0"`, shot at 1.7 s: the quit badge
-  filling in the corner; no pad joined, so the hints show key glyphs.
+See `handoff/handoff.json`.
 
-The refusal boop is sound only; the tests pin it (`hub.refusals`).
+## Not touched
 
-## Needs a gameplay decision
+Art, logo, palettes (V-01, V-02), audio, `project.godot` (no D-pad binding was missing), the launch-checklist TV
+rows (K-06), other repos.
 
-- **D-pad on the chooser (rule 3 vs rule 2).** The launcher's chooser is in-line in the walkable hub (M-01:
-  Select / Tab / slash cycles your character where you stand). Rule 2 says the D-pad only moves the character
-  in a walkable space, so it cannot also cycle the chooser. Options: (a) keep as is: the D-pad walks, Select
-  changes (FR-3 stays partial, or is marked as superseded by rule 2); (b) give the chooser its own
-  ready-up moment where the D-pad cycles. Recommendation: (a).
-- **Refusal during a launch.** A, B or Select pressed while the launch animation plays now boop (rule 4). A kid
-  mashing A through the launch will hear several boops over the launch beats. If that is too much, the
-  alternative is to stay silent during the launch only.
-
-## Template gaps
-
-- `Game.gd` (template autoload) handles `pause` / `restart` but the launcher never enters a round, so Start's
-  `pause` binding and Back's `restart` binding do nothing here by design. Not a launcher bug; noted in case the
-  template wants launcher-style projects to drop those actions.
-
-## Needs addons change
-
-None.
-
-## Notes
-
-- The untracked `assets/characters/*/…_face.png` and pattern PNGs that appear after a clean import are textures
-  Godot pulls out of the character models on import; they were not committed (not this lane's files).
-- Not covered by the refusal: the triggers (they are axes, not buttons) and the 600 ms return grace after a
-  game, which swallows the button that quit the game on purpose. A third pad pressing A while both slots are
-  taken is still silent (A is a bound button).
+Note: the clean import (`rm -rf .godot`) extracts the character models' embedded textures as untracked PNGs under
+`assets/characters/`. They were not in the repo before and are Art's folder, so I deleted them and did not commit them.

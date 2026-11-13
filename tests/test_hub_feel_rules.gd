@@ -207,3 +207,90 @@ func test_escape_held_quits_and_a_tap_does_not() -> void:
 	k.pressed = false
 	Input.parse_input_event(k)
 	await get_tree().process_frame
+
+
+## FR-3 (2026-11-13). The hub has no separate join/ready step: you join where you stand and the
+## chooser is in-line on your Jarling (GAME.md, chooser). These pin each path of that step.
+
+func _pad_on(device: int, button: int, down: bool) -> void:
+	var e := InputEventJoypadButton.new()
+	e.device = device
+	e.button_index = button
+	e.pressed = down
+	Input.parse_input_event(e)
+	await get_tree().process_frame
+
+
+func _join_p2_on_pad_one(hub: Node3D) -> void:
+	await _pad(JOY_BUTTON_DPAD_DOWN)   # pad 0: P1
+	await _pad_on(1, JOY_BUTTON_A, true)
+	await _pad_on(1, JOY_BUTTON_A, false)
+	assert_bool(hub.two_players).is_true()
+
+
+func test_p2_joined_on_a_pad_gets_its_own_select_and_a_hints() -> void:
+	var hub := await _hub()
+	await _join_p2_on_pad_one(hub)
+	_step(hub, 1)
+	var p2: HubJarling = hub.jarling_for(Players.P2)
+	assert_object(p2).is_not_null()
+	assert_bool(hub.launch.active).is_false()   # P2 waits at a jar: the A that joins never launches
+	assert_bool(p2.is_held()).is_true()
+	assert_bool(p2.hint_enabled).is_true()   # the hint follows the join: P2's ring has its own
+	assert_int(p2.hint_kind).is_equal(HintGlyph.Kind.SELECT)
+	assert_int(p2.go_hint_kind).is_equal(HintGlyph.Kind.A)
+
+
+func test_p2_joined_from_the_keyboard_gets_the_slash_and_enter_hints() -> void:
+	var hub := await _hub()
+	var k := _key_of("p2_action")
+	k.pressed = true
+	Input.parse_input_event(k)
+	await get_tree().process_frame   # the hub's own frame reads the press: P2 joins
+	await get_tree().process_frame
+	k.pressed = false
+	Input.parse_input_event(k)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert_bool(hub.two_players).is_true()
+	assert_bool(hub.launch.active).is_false()   # the key that joins never also launches
+	var p2: HubJarling = hub.jarling_for(Players.P2)
+	assert_bool(p2.hint_enabled).is_true()
+	assert_int(p2.hint_kind).is_equal(HintGlyph.Kind.SLASH)
+	assert_int(p2.go_hint_kind).is_equal(HintGlyph.Kind.ENTER)
+
+
+func test_p2_changes_character_with_select_on_their_own_pad_only() -> void:
+	Roster.data_path = "res://tests/fixtures/roster_three.json"
+	Roster.reload()
+	var hub := await _hub()
+	await _join_p2_on_pad_one(hub)
+	var p1_was := Roster.pick(Players.P1)
+	var p2_was := Roster.pick(Players.P2)
+	await _pad_on(1, JOY_BUTTON_BACK, true)
+	_step(hub, 1)
+	await _pad_on(1, JOY_BUTTON_BACK, false)
+	_step(hub, 1)
+	assert_str(Roster.pick(Players.P2)).is_not_equal(p2_was)
+	assert_str(Roster.pick(Players.P1)).is_equal(p1_was)
+	assert_int(hub.refusals).is_equal(0)
+
+
+## The D-pad on the chooser step: in this hub that step is walkable, and the D-pad walks (FR-1),
+## so its left / right walk and never cycle the character. Pins the decision in REPORT.md.
+func test_the_dpad_left_and_right_walk_and_never_change_the_character() -> void:
+	Roster.data_path = "res://tests/fixtures/roster_three.json"
+	Roster.reload()
+	var hub := await _hub()
+	var p1: HubJarling = hub.jarling_for(Players.P1)
+	var was := Roster.pick(Players.P1)
+	for b: int in [JOY_BUTTON_DPAD_RIGHT, JOY_BUTTON_DPAD_LEFT]:
+		var at := p1.position.x
+		await _pad_on(0, b, true)
+		_step(hub, 30)
+		await _pad_on(0, b, false)
+		_step(hub, 10)
+		var moved := p1.position.x - at
+		assert_float(moved if b == JOY_BUTTON_DPAD_RIGHT else -moved).is_greater(0.3)
+		assert_str(Roster.pick(Players.P1)).is_equal(was)
+	assert_int(hub.refusals).is_equal(0)
