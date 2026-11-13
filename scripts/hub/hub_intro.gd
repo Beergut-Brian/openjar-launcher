@@ -33,6 +33,7 @@ var _lid: Node3D
 var _logo: Sprite3D
 var _voices: Array[AudioStreamPlayer] = []
 var _land_at: Array[float] = []
+var _pending: Array[String] = []      # threaded loads not collected yet (K-07)
 
 
 ## The roster in order, keeping only characters with a body to show (Jeff and Chuck first, as the
@@ -60,17 +61,18 @@ func start(who: Array[String]) -> void:
 		v.bus = "SFX" if AudioServer.get_bus_index("SFX") != -1 else "Master"
 		add_child(v)
 		_voices.append(v)
+	# K-07: the bodies load on worker threads and each is built just before it tumbles out, so
+	# the first frame (and A to skip) never waits on the whole roster's glTF.
 	for i in n:
-		var scene := load(str(Roster.info(ids[i]).glb)) as PackedScene
+		var glb := str(Roster.info(ids[i]).glb)
+		if glb != "" and not ResourceLoader.has_cached(glb) and glb not in _pending \
+				and ResourceLoader.load_threaded_request(glb, "PackedScene") == OK:
+			_pending.append(glb)
 		var holder := Node3D.new()
 		add_child(holder)
-		var body: Node3D = scene.instantiate() if scene else Node3D.new()
-		body.scale = Vector3.ONE * CHARACTER_SIZE
-		holder.add_child(body)
 		holder.visible = false
 		_chars.append(holder)
 		_land_at.append(INF)
-		_play_anim(holder, "idle")
 	_events = [[0.0, "rattle", -1], [IntroPlan.T_POP, "pop", -1],
 		[IntroPlan.thump_time(n), "thump", -1], [IntroPlan.end_time(n) - IntroPlan.OUTRO, "lid", -1],
 		[IntroPlan.end_time(n), "end", -1]]
@@ -113,6 +115,32 @@ func advance(delta: float) -> void:
 		_pose()
 
 
+## Character i's body, built on first use: from its threaded load (waits only if that one isn't in
+## yet) or the cache. Its holder stays empty if the glTF is gone.
+func body(i: int) -> Node3D:
+	var holder := _chars[i]
+	if holder.get_child_count() > 0:
+		return holder
+	var glb := str(Roster.info(ids[i]).glb)
+	var scene: PackedScene = null
+	if glb != "":
+		if glb in _pending:
+			_pending.erase(glb)
+			scene = ResourceLoader.load_threaded_get(glb) as PackedScene   # waits only if not in yet
+		else:
+			scene = load(glb) as PackedScene
+	var b: Node3D = scene.instantiate() if scene else Node3D.new()
+	b.scale = Vector3.ONE * CHARACTER_SIZE
+	holder.add_child(b)
+	_play_anim(holder, "idle")
+	return holder
+
+
+## How many bodies are built so far (tests).
+func bodies_built() -> int:
+	return _chars.filter(func(c: Node3D) -> bool: return c.get_child_count() > 0).size()
+
+
 func _beat(kind: String, i: int) -> void:
 	match kind:
 		"rattle":
@@ -124,7 +152,7 @@ func _beat(kind: String, i: int) -> void:
 			landed += 1
 			_land_at[i] = t
 			HubJarling.poof(self, _spots[i] + Vector3(0, 0.2, 0))
-			_play_anim(_chars[i], "cheer")
+			_play_anim(body(i), "cheer")
 			if not _say(i):
 				Audio.play("ui_move")   # no voice (yet) for this one: a landing tick, never silent
 		"thump":
@@ -132,7 +160,8 @@ func _beat(kind: String, i: int) -> void:
 			shake_at = t   # the camera feels it land (IntroPlan.shake), only here: never the chooser or a launch
 			Audio.music("card_row_loop")
 			for c in _chars:
-				_play_anim(c, "cheer")
+				if c.get_child_count() > 0:
+					_play_anim(c, "cheer")
 		"lid":
 			Audio.play("lid_bonk")
 		"end":
@@ -159,6 +188,29 @@ func _say(i: int) -> bool:
 
 func voices_playing() -> int:
 	return _voices.filter(func(v: AudioStreamPlayer) -> bool: return v.playing).size()
+
+
+## Skipped before everyone was built: collect the loads still in flight once each is in, a frame at
+## a time, so A never waits on them and none is left behind.
+func _exit_tree() -> void:
+	if not _pending.is_empty() and is_inside_tree():
+		_collect(get_tree(), _pending.duplicate())
+	_pending.clear()
+
+
+static func _collect(tree: SceneTree, paths: Array[String]) -> void:
+	while not paths.is_empty():
+		for p in paths.duplicate():
+			if ResourceLoader.load_threaded_get_status(p) != ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+				ResourceLoader.load_threaded_get(p)
+				paths.erase(p)
+		if not paths.is_empty():
+			await tree.process_frame
+
+
+## Loads still in flight (tests).
+func pending_loads() -> int:
+	return _pending.size()
 
 
 func _finish() -> void:
@@ -223,6 +275,8 @@ func _pose() -> void:
 		var back := P.back_time(i, n)
 		var to := _spots[i]
 		c.visible = t >= go and t < back + P.BACK_FLIGHT
+		if t >= go - P.FLIGHT:   # built a beat before it leaps, never all at once
+			body(i)
 		if not c.visible:
 			continue
 		var face := atan2(cam.x - to.x, cam.z - to.z)

@@ -87,6 +87,8 @@ row whose notes say something is rough:
 - [ ] K-06: F3 on the GTX 1060, 1080p: 60 fps in the hub, the intro (22 characters) and a launch.
 - [ ] K-07: cold start under 10 s: read the `launcher: interactive` line (the box's software GPU gives
       6.5 to 11.8 s depending on load, most of it first-frame pipeline compiling, so only the TV settles it).
+      Gap-close-6 marked the row built on the producer box's numbers; read it twice on the TV: the first boot
+      of the day (the intro plays; the line has an `intro` mark) and a second boot.
 - [ ] S-02: one launch and return: read the `launcher: window:` lines (minimised while the game runs,
       fullscreen and in front after). Already proven under openbox on the box: `docs/evidence/s02-window-log.txt`.
 - [ ] C-14: install Smash Party (`kiosk/smash-party/install.sh`), launch it, play with a pad in the

@@ -198,6 +198,7 @@ func _ready() -> void:
 			LauncherState.mark_intro_played(Save, LauncherState.today())
 			Save.flush()
 		play_intro()
+		_mark("intro")
 	else:
 		Audio.music("card_row_loop")
 	_update_camera(0.0)
