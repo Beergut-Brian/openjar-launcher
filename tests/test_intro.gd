@@ -214,6 +214,20 @@ func test_bodies_are_built_one_by_one_as_they_leap_not_before_the_first_frame() 
 	assert_int(intro.bodies_built()).is_equal(n)
 
 
+## A skip before everyone was built leaves no threaded load behind (each would leak at exit).
+func test_loads_still_in_flight_are_collected_without_waiting() -> void:
+	var path := "res://icon.svg"
+	assert_int(ResourceLoader.load_threaded_request(path)).is_equal(OK)
+	var paths: Array[String] = [path]
+	HubIntro._collect(get_tree(), paths)   # returns at once; finishes over the next frames
+	for i in 300:
+		if paths.is_empty():
+			break
+		await get_tree().process_frame
+	assert_array(paths).is_empty()
+	assert_int(ResourceLoader.load_threaded_get_status(path)).is_equal(ResourceLoader.THREAD_LOAD_INVALID_RESOURCE)
+
+
 func test_skip_ends_it_at_once() -> void:
 	var intro := _intro(HubIntro.cast())
 	intro.advance(1.2)

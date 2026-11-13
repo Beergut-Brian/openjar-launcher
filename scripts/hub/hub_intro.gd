@@ -33,6 +33,7 @@ var _lid: Node3D
 var _logo: Sprite3D
 var _voices: Array[AudioStreamPlayer] = []
 var _land_at: Array[float] = []
+var _pending: Array[String] = []      # threaded loads not collected yet (K-07)
 
 
 ## The roster in order, keeping only characters with a body to show (Jeff and Chuck first, as the
@@ -64,8 +65,9 @@ func start(who: Array[String]) -> void:
 	# the first frame (and A to skip) never waits on the whole roster's glTF.
 	for i in n:
 		var glb := str(Roster.info(ids[i]).glb)
-		if glb != "" and not ResourceLoader.has_cached(glb):
-			ResourceLoader.load_threaded_request(glb, "PackedScene")
+		if glb != "" and not ResourceLoader.has_cached(glb) and glb not in _pending \
+				and ResourceLoader.load_threaded_request(glb, "PackedScene") == OK:
+			_pending.append(glb)
 		var holder := Node3D.new()
 		add_child(holder)
 		holder.visible = false
@@ -122,8 +124,9 @@ func body(i: int) -> Node3D:
 	var glb := str(Roster.info(ids[i]).glb)
 	var scene: PackedScene = null
 	if glb != "":
-		if ResourceLoader.load_threaded_get_status(glb) != ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
-			scene = ResourceLoader.load_threaded_get(glb) as PackedScene
+		if glb in _pending:
+			_pending.erase(glb)
+			scene = ResourceLoader.load_threaded_get(glb) as PackedScene   # waits only if not in yet
 		else:
 			scene = load(glb) as PackedScene
 	var b: Node3D = scene.instantiate() if scene else Node3D.new()
@@ -185,6 +188,29 @@ func _say(i: int) -> bool:
 
 func voices_playing() -> int:
 	return _voices.filter(func(v: AudioStreamPlayer) -> bool: return v.playing).size()
+
+
+## Skipped before everyone was built: collect the loads still in flight once each is in, a frame at
+## a time, so A never waits on them and none is left behind.
+func _exit_tree() -> void:
+	if not _pending.is_empty() and is_inside_tree():
+		_collect(get_tree(), _pending.duplicate())
+	_pending.clear()
+
+
+static func _collect(tree: SceneTree, paths: Array[String]) -> void:
+	while not paths.is_empty():
+		for p in paths.duplicate():
+			if ResourceLoader.load_threaded_get_status(p) != ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+				ResourceLoader.load_threaded_get(p)
+				paths.erase(p)
+		if not paths.is_empty():
+			await tree.process_frame
+
+
+## Loads still in flight (tests).
+func pending_loads() -> int:
+	return _pending.size()
 
 
 func _finish() -> void:
