@@ -50,6 +50,10 @@ the plan-status lane against the code, the test run and real frames, not against
   V-02 skipped (Kaden's pick and the Art Director process). `scripts/tools/test.sh` exits 0: 198 test cases, 0 failures,
   0 engine errors (`handoff/test-output.txt`). **Totals (recount):** 88 rows: 74 built, 11 superseded, 2 partial
   (V-01, V-02), 1 missing (K-06).
+- **Rules-audit-1** (`fix/launcher-rules-audit-1`, 2026-11-13): Kaden's standing feel rules (S8) audited against `dev`
+  at `a1519fb`, rows FR-1 to FR-7. One fix: an ignored press is no longer silent (FR-4). `scripts/tools/test.sh`
+  (clean import first) exits 0: 209 test cases, 0 failures, 0 engine errors (`handoff/test-output.txt`).
+  **Totals (recount):** 95 rows: 79 built, 11 superseded, 3 partial (V-01, V-02, FR-3), 1 missing (K-06), 1 N/A (FR-7).
 - **Status values:** built / partial / missing / superseded / dropped / later (see `~/openjar/lanes/plan-status-format.md`).
 
 Sources (oldest first):
@@ -66,6 +70,10 @@ Sources (oldest first):
   It can just be a part of the ready up screen". Also covers the GAME.md "(chooser)" decisions.
 - S6 Kaden chat, 2026-11-10: "when a character is up on the screen, I'd like it to say it's catchphrase once."
 - S7 `playtests/2026-11-12.md`, Kaden's first playtest notes (the PT1112 rows). Before it, `playtests/` held only `_TEMPLATE.md`.
+- S8 Standing feel rules (2026-11-13), Kaden's game-feel rules as audited on Worm: no stick-only requirement;
+  in a walkable space the stick (and D-pad) only moves the character, no snap or hop-to-next; join and ready
+  with buttons and keys; every press is heard; context hints with glyphs; quitting never needs a force-close;
+  solo and start-fresh (per game). The FR rows.
 - Kaden, 2026-11-10: there is no stick-only requirement any more. No row asked for one (P-04 is "walk
   anywhere", which the D-pad and keys also do), so no row was dropped.
 
@@ -209,6 +217,20 @@ frame and result in `handoff/PLAYER-FLOW.md` (frames `handoff/shots/pf-*.png`).
 | PF-4 | Player flow | Keyboard: arrow keys are P2's, README said they walk (P1 never moved) | built | `README.md` controls table (WASD/Space/Shift for P1, arrows/Enter/Ctrl for P2); frame `pf-10-keyboard-arrows-move-p2.png` | GAME.md's Controls row still says "arrow keys": Hermes's doc. |
 | PF-5 | Player flow | P1's pad going away is silent (P2 has a bye) | built | `hub.gd` `_on_player_left` (P1: the leave cue, a hop, the Jarling stops where it is and stays P1's; not while a game has the TV); `tests/test_launch_ready.gd::test_p1_dropping_out_is_heard_and_seen` (real pad join, then the real `Players` disconnect path); frames `handoff/frames/pf5_p1_pad_leaves_strip.jpg`, `pf5_01_walking_on_pad.jpg` … `pf5_03_keys_hint_after.jpg` | Was `open` (not a status value), counted here as partial. Gap-close-5, 2026-11-13: same bye as P2 (`player_leave` and a hop). Any button on a free pad still makes it P1 again. The hop is too small to read in a still; the test pins it. |
 | PF-6 | Player flow (tooling) | Scripted runs could not press real buttons | built | `hub.gd` demo `btn:` / `axis:` / `key:` / `unplug:` (real input events through `Players` and the input map) | Used for every PF frame. |
+
+## Standing feel rules 2026-11-13 (FR)
+
+Audited against `dev` at `a1519fb`; report `REPORT.md`, frames `handoff/frames/rules_*.jpg`.
+
+| ID | Source | Item | Status | Proof | Notes |
+| --- | --- | --- | --- | --- | --- |
+| FR-1 | S8 | The D-pad moves the hub character, the same as the stick | built | `tests/test_hub_dpad.gd::test_dpad_walks_player_one_every_direction`, `::test_dpad_walks_player_two_every_direction` (real pad events, one test per pad slot: each direction walks that way, P2's D-pad never moves P1); frames `handoff/frames/rules_dpad_01_before_p1_at_start_jar.jpg` → `_02_dpad_right_held_walking.jpg` → `_03_after_walked_to_jar_a_and_select_hints.jpg` (`HUB_DEMO=follow;1.2:btn:0:14:1;2.4:btn:0:14:0`) | Already built by PF-3 (D-pad buttons in `project.godot`'s p1_/p2_move_*; `hub.gd` `_read_players` reads `Players.move_vector`). No code change; P2's slot was untested until now. |
+| FR-2 | S8 | No forced movement and no snap in the hub: the stick only moves the character; walk up to a jar to focus it, A uses it | built | `tests/test_hub_dpad.gd::test_dpad_held_walks_past_a_jar_instead_of_hopping_to_it`, `tests/test_hub.gd::test_holding_right_walks_past_the_jars_instead_of_snapping`, `::test_walk_away_then_walk_up_to_another_jar_to_focus_it` | `HubJarling.stick_velocity` is the raw stick, no pull; focus is `HubLayout.focus_at` (position only). The only steering is the `HUB_DEMO` `go:` script. |
+| FR-3 | S8 | Join and ready with A and the keyboard; the chooser in the join/ready step works with the D-pad | partial | `tests/test_hub_feel_rules.gd::test_p2_joins_with_a_on_a_second_pad`, `::test_p2_joins_from_the_keyboard`; `tests/test_player_flow.gd::test_a_dpad_press_joins_and_walks_player_one`; `tests/test_playtest_1112.gd::test_p2_at_a_jar_presses_a_and_launches_it_and_nobody_is_moved` | Join and "ready" (A at a jar) are built for pads and keys. There is no separate join/ready step: the chooser is in-line in the hub (M-01, Select / Tab / slash), and in the hub the D-pad walks (FR-1, FR-2). A D-pad chooser would break FR-2: gameplay decision (REPORT.md). |
+| FR-4 | S8, CLAUDE.md #7 | Every press is heard; a press with no effect plays a refusal sound | built | `tests/test_hub_feel_rules.gd::test_buttons_no_hub_action_uses_refuse_out_loud`, `::test_buttons_that_do_something_never_refuse`, `::test_a_and_b_mid_jump_say_not_now`, `::test_the_chooser_mid_swap_says_not_now`, `::test_presses_during_a_launch_say_not_now` | Was partial: A / B / the chooser mid-jump, mid-swap or during a launch, B and the chooser during the intro, and X / Y / stick clicks / stray keys were silent. Now `hub.gd` `refuse()` plays `ui_back` (the "can't do that" cue, CUES.md), once a frame; LB / RB alone tick (`ui_move`) like Start. Not covered: the triggers (axes) and the 600 ms return grace that swallows the button that quit the game. |
+| FR-5 | S8 | The hub hint changes with context, with controller glyphs | built | `tests/test_player_flow.gd::test_a_jar_in_focus_shows_the_jump_in_button`, `::test_the_jump_in_button_follows_the_players_pad_or_key`, `::test_the_empty_jar_never_offers_jump_in`, `tests/test_hint_glyph.gd`; frames `handoff/frames/rules_dpad_03_after_walked_to_jar_a_and_select_hints.jpg` (pad: A + into-the-jar, Select chooser), `rules_quit_start_held_badge_filling.jpg` (no pad: the Space / Tab key glyphs) | PF-1, M-01. Start-hold shows the quit badge only while held (K-02). |
+| FR-6 | S8 | Quitting never needs a force-close, from the hub and from the menu | built | `tests/test_quit_hold.gd::test_holding_start_quits`, `::test_a_tap_on_start_does_not_quit_but_shows_the_badge`, `tests/test_hub_feel_rules.gd::test_escape_held_quits_and_a_tap_does_not`, `tests/test_audio_release.gd::test_close_button_goes_through_audio_quit`; frame `handoff/frames/rules_quit_start_held_badge_filling.jpg` | Start (pad) or Escape (keys) held 1.5 s; the window's close button goes through `Audio.quit` too. The launcher has no menu (the `pause` action does nothing outside a round, `Game.gd`), so "from the menu" has nothing to check. A running command game: Start held 2 s (C-14). |
+| FR-7 | S8 | Solo mode and start-fresh | N/A | `Save.gd` holds only the launcher's settings (`LauncherState`: the last jar and the profile; the dev view is session-only); no game progress lives in the launcher. Solo is per game (`Players.gd` in each game). | Not added here, per the rule. |
 
 ## Unrecorded: GAME.md contradicts the plan
 
