@@ -12,7 +12,17 @@ const KINDS := 8
 const FIT_RADIUS := 0.8
 const FIT_HEIGHT := 1.9
 
+## NS-2: the stock "Retro Games" world for an emulator jar (a manifest with `"profiles": false` and no
+## `jar` of its own): a plain chunky game cartridge made of pixel blocks. No logos, no words.
+const RETRO := KINDS   # GameSpot.world_kind for it, outside the generated kinds
+const RETRO_ACCENT := Color("a78bff")   # its jar's colour when the manifest has no grid art
+
 static var _mats := {}
+
+
+## Does this entry get the stock Retro Games world (when it has no `jar` of its own)?
+static func is_retro(e: Dictionary) -> bool:
+	return not e.is_empty() and not e.get("profiles", true)
 
 
 static func kind_for(slug: String) -> int:
@@ -211,6 +221,51 @@ static func build(kind: int, c: Color) -> Node3D:
 				_a(D, _cyl(0.22, 0.22, 0.08, 24), _m([c, pop, pale][i], 0.3), p + Vector3(0, h + 0.15, 0), Vector3(90, 0, 0))
 			_a(D, _torus(0.1, 0.24, 24), _m(Color("c98a4b")), Vector3(0.3, 0.15, 0.3))
 			_a(D, _torus(0.11, 0.23, 24), _m(c.lerp(Color.WHITE, 0.3)), Vector3(0.3, 0.2, 0.3), Vector3.ZERO, Vector3(1, 0.4, 1))
+	return D
+
+
+## A cartridge standing on a pixel floor: a body with one cut corner, grip ridges, a cream label with a
+## little pixel heart, gold contacts along the bottom, and a few glowing pixel cubes bobbing round it.
+static func build_retro(c: Color = RETRO_ACCENT) -> Node3D:
+	var D := Node3D.new()
+	var floor_a := Color("3a2f66")
+	var floor_b := floor_a.lerp(c, 0.35)
+	_ground(D, floor_a)
+	var tile := 0.24
+	for ix in range(-3, 4):   # a checker of pixel tiles on the ground
+		for iz in range(-3, 4):
+			var p := Vector3(ix * tile, 0.1, iz * tile)
+			if Vector2(p.x, p.z).length() > 0.74 or (ix + iz) % 2 == 0:
+				continue
+			_a(D, _box(Vector3(tile, 0.02, tile)), _m(floor_b, 0.6), p)
+	var cart := Node3D.new()
+	cart.position = Vector3(0, 0.12, 0.02)
+	cart.rotation_degrees = Vector3(-6, -12, 0)
+	D.add_child(cart)
+	var body := _m(c.lerp(Color("d8d4e8"), 0.55), 0.5)
+	var dark := _m(c.darkened(0.35), 0.6)
+	_a(cart, _box(Vector3(0.96, 0.98, 0.2)), body, Vector3(0, 0.6, 0))           # the body
+	_a(cart, _box(Vector3(0.78, 0.16, 0.2)), body, Vector3(-0.09, 1.17, 0))      # top, one corner cut
+	_a(cart, _box(Vector3(0.16, 0.08, 0.2)), body, Vector3(0.31, 1.13, 0))       # the stepped (pixel) corner
+	for i in 3:   # grip ridges low on the front
+		_a(cart, _box(Vector3(0.62, 0.035, 0.04)), dark, Vector3(0, 0.2 + i * 0.07, 0.115))
+	_a(cart, _box(Vector3(0.66, 0.5, 0.03)), _m(Color("fff4dc"), 0.7), Vector3(0, 0.75, 0.11))   # the label
+	var heart := [".XX.XX.", "XXXXXXX", "XXXXXXX", ".XXXXX.", "..XXX..", "...X..."]
+	var px := 0.055
+	var pop := Color.from_hsv(fposmod(c.h + 0.5, 1.0), 0.6, 1.0)
+	for row in heart.size():
+		for col in heart[row].length():
+			if heart[row][col] == "X":
+				_a(cart, _box(Vector3(px, px, 0.02)), _glow(pop, 1.8),
+						Vector3((col - 3) * px, 0.92 - row * px, 0.13))
+	_a(cart, _box(Vector3(0.8, 0.1, 0.16)), dark, Vector3(0, 0.07, 0))           # the edge it plugs in by
+	for i in 7:   # gold contacts
+		_a(cart, _box(Vector3(0.05, 0.08, 0.01)), _glow(Color("ffd23f"), 1.6), Vector3(-0.3 + i * 0.1, 0.07, 0.085))
+	for i in 5:   # glowing pixel cubes floating round it
+		var a := TAU * i / 5.0 + 0.4
+		var cube := _a(D, _box(Vector3.ONE * (0.07 + 0.02 * (i % 2))), _glow([pop, Color("8fe3ff"), Color("ffd23f")][i % 3], 2.2),
+				Vector3(sin(a) * 0.66, 0.55 + fmod(i * 0.41, 1.0), cos(a) * 0.5), Vector3(0, 45 * i, 30))
+		cube.set_meta("bob", 1.4 + i * 0.35)
 	return D
 
 

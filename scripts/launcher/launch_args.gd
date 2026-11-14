@@ -13,6 +13,8 @@ const CHAR_ARG := {0: "--p1-char=", 1: "--p2-char="}   # by player slot (Players
 ## {"path": String, "args": PackedStringArray}. path is "" if the entry cannot be launched.
 ## chars: player slot → Roster id, passed as --p1-char= / --p2-char= after --profile= (the game's
 ## Roster reads them before the shared picks file). Ids that are not plain identifiers are dropped.
+## An entry with `"profiles": false` (an emulator frontend, NS-2) gets none of the launcher's own
+## arguments (no --profile=, no --pN-char=): only its command and its manifest's `args`.
 static func build(entry: Dictionary, profile: String, chars: Dictionary = {}) -> Dictionary:
 	if not profile in PROFILES:
 		profile = DEFAULT_PROFILE
@@ -27,10 +29,11 @@ static func build(entry: Dictionary, profile: String, chars: Dictionary = {}) ->
 		args.append_array(command.slice(1))
 	else:
 		path = entry.get("binary", "")
-	args.append("--profile=%s" % profile)
-	for p: int in [0, 1]:
-		var id := str(chars.get(p, ""))
-		if id.is_valid_identifier():
-			args.append(CHAR_ARG[p] + id)
+	if entry.get("profiles", true):
+		args.append("--profile=%s" % profile)
+		for p: int in [0, 1]:
+			var id := str(chars.get(p, ""))
+			if id.is_valid_identifier():
+				args.append(CHAR_ARG[p] + id)
 	args.append_array(entry.get("args", PackedStringArray()))
 	return {"path": path, "args": args}
