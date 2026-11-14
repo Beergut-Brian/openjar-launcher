@@ -22,7 +22,7 @@ func before_test() -> void:
 	Save.wipe()
 	root = ""
 	Roster.picks_path = PICKS
-	Roster.data_path = "res://data/roster.json"
+	Roster.data_path = "res://tests/fixtures/roster_three.json"   # a fixture, never the real roster's contents
 	Roster.args_override = PackedStringArray(["--test-hub"])
 	_wipe_picks()
 

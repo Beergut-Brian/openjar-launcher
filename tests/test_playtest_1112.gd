@@ -22,7 +22,7 @@ func before_test() -> void:
 	Save.profile = PROFILE
 	Save.wipe()
 	Roster.picks_path = PICKS
-	Roster.data_path = "res://data/roster.json"
+	Roster.data_path = "res://tests/fixtures/roster_three.json"   # a fixture, never the real roster's contents
 	Roster.args_override = PackedStringArray(["--test-pt1112"])
 	Roster.reload()   # picks from this test's own file (empty: the roster defaults), not from an earlier test
 	LauncherState.reset_session()

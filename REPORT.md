@@ -1,67 +1,78 @@
-# Report: hub-refusal-1 (hub refusal feedback lane)
+# Report: launch-ready-3 (launch-readiness lane, pass 3)
 
-Branch `feature/hub-refusal-1` (off `dev`; `git fetch origin && git merge origin/dev`: already up to date at `2d70a0b`).
-Not pushed.
+Branch `feature/launcher-launch-ready-3`, based on `origin/dev` at `9a18f24` (after press-answers-adopt-1,
+hub-refusal-1, rules-audit-1, FR3-1, FR3-decide-1). Not pushed.
+
+**Verdict:** the launcher hub is launch-ready on the producer box. Still open: the TV-box checks
+(K-06 and real pads, Kaden's weekend item) and the items under "Needs Kaden".
 
 ## What changed
 
-A press the hub refuses was heard (`ui_back`) but not seen. CLAUDE.md #7 wants both. Now `refuse(player)` answers on
-the player who pressed, for about 0.3 s (`HubJarling.REFUSE_SECONDS`), and never moves anyone:
+- `tests/test_hub.gd`, `test_hub_feel_rules.gd`, `test_hub_refusal.gd`, `test_playtest_1112.gd`,
+  `test_player_flow.gd`, `test_hub_dpad.gd`: `before_test` loaded `data/roster.json`. Two chooser tests
+  (`test_hub.gd::test_solo_change_trades_with_the_tag_along_and_is_remembered`,
+  `::test_the_change_button_cycles_but_not_during_a_launch`) relied on the real roster's order, so they now load
+  `tests/fixtures/roster_three.json`. Only `tests/test_real_roster_voices.gd` still reads the real roster, on
+  purpose: it pins the vendored voices.
+- `docs/launch-checklist.md` rewritten for `dev` at `9a18f24`: each standing rule with yes / no / n/a and its proof,
+  the TV checks spelled out step by step, Needs Kaden, and how to load the build.
+- `README.md`: P2 also drops in with a stick push (PT1112-1). The README said a button only.
+- `PLAN-STATUS.md`: a launch-ready-3 line in the header. No row moved.
 
-| That player's Jarling is... | Visible answer |
-| --- | --- |
-| idle (standing or walking) | `shake()`: a no-no head shake. The body tilts about its middle (`_flip.rotation.z`), so its position never changes. |
-| busy: mid-jump, mid-swap, or a launch is playing | `flash()`: its ring blinks white and pops bigger. The body is left alone, so the jump or swap isn't disturbed. |
-| out of sight: the intro, inside the jar after the leap, or no Jarling | `flash_bar()`: a 36 px bar in the player's colour (P1 green on the left half, P2 red on the right) along the bottom edge. It shows at once and is gone by 0.3 s. No words. |
+No game code changed. The text check found nothing to remove: no placeholder text, and the hub shows only the
+glyph hints, the 1.5 s name tags and the faint version label in the corner. Log lines go to stdout only. F3
+(stat overlay) and F12 (screenshot) are keyboard-only. F3 stays because K-06 needs it.
 
-- `scripts/hub/hub.gd`: `refuse(player)` (all 5 call sites pass the player; a raw pad button goes to the pad's owner,
-  stray keys go to P1), `flash_bar`, `refuse_bars`, `bar_flashes`, `REFUSE_BAR_HEIGHT`. It now fires once a frame
-  **per player** (it was once a frame for both), so two players mashing in the same frame each get an answer.
-- `scripts/hub/jarling.gd`: `shake()` now counts (`shakes`), restarts cleanly and lasts 0.3 s (it was 0.24 s). The
-  chooser's "nobody free" shake uses it too. New: `flash()`, `flashes`, `ring_flashing()`, `ring_shown()`.
-- Same refusal sound (`ui_back`); no audio, art, save, join or chooser-flow changes.
-- The launcher has no `docs/ui.md` and no template menu kit, so this is a hub-only change, as the brief expected.
+## Rows
+
+- **Moved:** none. Open rows on `9a18f24`: V-01 and V-02 (partial), K-06 (missing). FR-7 is N/A.
+- **Skipped:**
+  - V-01 (logo): art. It needs Kaden's pick and the Art Director process.
+  - V-02 (palette): art. It needs Kaden's pick and the Art Director process.
+  - V-06 (store art redo after V-01): art. Built, so it was not reopened.
+  - K-06 (60 fps on the GTX 1060): needs the TV box.
+- Totals unchanged: 95 rows, 79 built, 12 superseded, 2 partial, 1 missing, 1 N/A.
+
+## Session flow frames (`handoff/frames/`, Forward+ on the software GPU, `tests/fixtures/hub_8`)
+
+Every run exited 0 with 0 script errors. I looked at every frame.
+
+| Step | Frame | What it shows |
+| --- | --- | --- |
+| Main menu (the hub is the launcher's only screen) | `join_t000.8s.png` | Jar Island at boot with 8 jars. Jeff stands at the middle jar showing the keyboard hints (no pad has joined yet). Chuck waits with no ring. `v0.0.0-local` sits small in the corner. |
+| Ready-up: P1 presses A | `join_t002.0s.png` | P1's A on pad 0 at the jar: Jeff dives into the jar, the lid spins off, a light beam. It launches the fixture game and comes back (`dino-dash exited (code 0)`). |
+| Ready-up: P2 presses A | `join_t004.5s.png` | P2's A on pad 1 joins: Chuck gets a red ring, and A plus the into-the-jar glyph show at his jar. Jeff is back with a green ring. Nobody was moved. |
+| Ready-up alone | `alone_quit_t002.0s.png`, `alone_quit_t002.5s.png` | One player walks away with the stick and presses A: a happy cheer (arms up), no launch. The hub has no ready step (FR-3 superseded): one player's A at a jar launches. |
+| Pause / back to the launcher | `alone_quit_t003.7s.png`, `alone_quit_t005.9s.png` | No pause menu exists: this is the launcher. A Start tap shows the door badge top right with a sliver filled. Holding Start fills the ring. The run then exits 0 on its own (the 9 s frame never came). Quit without a force-close. |
+| Solo `--solo` and Select+Start 2 s | `solo_combo_t000.8s.png`, `t001.4s.png`, `t002.2s.png` | `--solo` changes nothing (normal hub; solo is per game, FR-7). Select+Start held: Select swaps P1 Jeff → Chuck (name tags "Chuck" and "Jeff", Jeff becomes the waiting friend) and the Start hold fills the door badge. The launcher quit at 1.5 s, before the 4 s frame. See Needs Kaden. |
+| Drop-in | `dropout_t003.5s.png` | Both joined on pads, each at their own jar with their own A hints. Green and red rings, and each jar's floor pad lights in its player's colour. |
+| Drop-out | `dropout_t004.3s.png`, `dropout_t006.0s.png` | P2's pad unplugged (`unplug:1`). The camera reframes on P1 (Jeff at the purple jar, A and Select hints). Chuck stays where he stood with no ring, out of shot. |
+
+## Soak
+
+`scripts/tools/soak.sh` (headless, 1800 s, the scripted session: walk, launch, return, change, P2 in and out, profile
+swap), user data in `.scratch/`: **0 script or engine errors**, exit 0, 0 orphans, 66 launches and returns.
+After a 2 min warm-up the counts stay flat: objects 3119 → 3097, nodes 624 → 626, static memory 116 → 100 MB.
+Log: `handoff/soak/soak.tsv`, `soak.log`.
+
+A first soak attempt aborted at 570 s. My fault: I wiped `.godot/` for the clean-import test run while the soak was
+still running, so its imported models vanished mid-run (`handoff/soak/soak-aborted-by-cache-wipe.log`; every error
+starts with `Cannot open file 'res://.godot/imported/...'`). It is not a launcher bug, and the re-run above is clean.
+One side note: after a failed model load, `jarling.gd:489` `_squash` touches a freed body and the engine crashes.
+A player can't hit it, since it needs the import cache deleted under a running build. I did not fix it.
 
 ## Tests
 
-`tests/test_hub_refusal.gd`, 6 tests. Each one checks that the refusal count goes up and that the shake or flash
-counter goes up:
-- unused pad button, idle → shake. It also checks the Jarling is upright again and hasn't moved.
-- P2's unused button → only P2's Jarling answers.
-- A mid-jump → ring blink, no shake. The blink is over after 0.3 s.
-- chooser mid-swap → ring blink.
-- B during a launch → ring blink before the leap; A after the leap → P1's bar.
-- B during the intro → P1's bar in P1's colour, faded after 0.3 s.
+`scripts/tools/test.sh` after a clean import (`.godot/` removed), `--ignoreHeadlessMode --continue`: **219 test
+cases, 0 failures, 0 errors, 0 orphans, 0 engine ERROR lines** (`handoff/test-output.txt`). The hub has no physics
+bodies (`HubLayout.walkable` clamps positions), so no test depends on a pile.
 
-The tests use a throwaway Save profile and picks file. `scripts/tools/test.sh` keeps all user data under `.scratch/`.
+## Needs Kaden
 
-**Full suite on a clean import** (`.godot/` removed, then `scripts/tools/test.sh`): exit 0, **219 test cases** (213
-before), 0 failures, 0 errors. Output in `handoff/test-output.txt`.
+- **Select+Start in the hub quits.** In the games, Select+Start held 2 s means solo. In the hub, the same hold
+  changes your character and then quits to Steam at 1.5 s (frames `solo_combo_*`). Keep it, or have the hub
+  ignore the Start hold while Select is down?
+- V-01 logo pick and V-02 palette pick (open since 2026-11-09).
+- (Optional, open since 2026-11-10) K-02: keep Start as a 1.5 s hold, or go back to one press.
 
-## Frames (looked at)
-
-These are real frames from `scripts/tools/shots.sh` with `HUB_DEMO`, fixture `hub_8`, rendered by Forward+ on the
-software GPU. They are in `handoff/frames/`, which is git-ignored, as before.
-- Idle shake (`follow;1:btn:0:12:1;1.05:btn:0:12:0;2.97:btn:0:2:1;3.0:btn:0:2:0`, X on P1's pad):
-  `refusal_01_idle_before_x.png`, `refusal_02_idle_x_head_shake.png`, `refusal_03_idle_x_shake_back.png`,
-  `refusal_04_idle_after_upright.png`, strip `refusal_strip_idle_shake.png`. The tilt is visible but modest in a still.
-- Mid-swap ring blink (same, plus `2.95:change`): `refusal_05_mid_swap_x_ring_blinks.png` (the ring is pale and big),
-  `refusal_06_mid_swap_after_ring_green.png`, strip `refusal_strip_mid_swap_ring.png`.
-- Inside the jar during a launch (`...;2:a;3.47:btn:0:2:1;3.5:btn:0:2:0`): `refusal_07_inside_jar_before_x.png`,
-  `refusal_08_inside_jar_x_p1_bar.png` (green bar, bottom left), `refusal_09_inside_jar_bar_gone.png`. The first take
-  had an 18 px bar at 0.9 alpha that was hard to see, so I made it 36 px and fully opaque, held for 0.1 s.
-- Not framed: the intro bar. Demo commands wait until the intro ends, so a scripted press can't land during it. The
-  test covers it.
-
-## PLAN-STATUS
-
-- **FR-4** updated in place: the proof has the 6 new tests and frames, and the notes describe the visible answer. Its
-  status was already `built` (for the sound), so no status changed and the totals are unchanged (95 rows). I added a
-  Hub-refusal-1 line to the run log.
-- Moved row IDs: **FR-4** (built → built, proof and notes extended). There was no separate "seen" row to move.
-
-## For Gary / Hermes
-
-- The clean import extracted embedded character textures as untracked PNGs under `assets/characters/*/`. They are
-  not committed (art is off-limits, and they're import by-products). Delete them or ignore them as you prefer.
-- Worth a TV check: whether the 0.3 s head shake reads from the couch. Bump the angles in `HubJarling.shake()` if not.
+No playtest result was invented. The TV checks are listed in `docs/launch-checklist.md`, "Needs the TV box".
