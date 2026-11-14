@@ -11,7 +11,7 @@ built and verified: `PLAN-STATUS.md` and `docs/launch-checklist.md`.
 ## Play
 
 Either pad drives it; the first pad is player 1 (green ring), a second pad drops in as player 2
-(red ring) by pressing a button, and drops out by going away (unplugged or asleep).
+(red ring) by pressing a button or pushing the stick, and drops out by going away (unplugged or asleep).
 
 | Input | Does |
 | --- | --- |

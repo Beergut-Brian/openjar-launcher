@@ -65,6 +65,12 @@ the plan-status lane against the code, the test run and real frames, not against
 - **FR3-decide-1** (`docs/fr3-decide-1`, 2026-11-14): Gary decided both open FR-3 paths under the standing rules; FR-3 is now `superseded`
   (docs only, no code or tests changed). **Totals (recount):** 95 rows: 79 built, 12 superseded, 2 partial (V-01, V-02),
   1 missing (K-06), 1 N/A (FR-7).
+- **Launch-ready-3** (`feature/launcher-launch-ready-3`, 2026-11-14): every open row re-audited against `dev` at `9a18f24`.
+  No row moves: V-01, V-02 skipped (art: Kaden's pick and the Art Director process), K-06 skipped (weekend TV check).
+  The six hub suites that read the real roster now use `tests/fixtures/roster_three.json`; `docs/launch-checklist.md`
+  rewritten (standing rules with proofs, TV checks, load steps). `scripts/tools/test.sh` (clean import first) exits 0:
+  219 test cases, 0 failures, 0 engine errors (`handoff/test-output.txt`). **Totals:** unchanged (95 rows: 79 built,
+  12 superseded, 2 partial, 1 missing, 1 N/A).
 - **Status values:** built / partial / missing / superseded / dropped / later (see `~/openjar/lanes/plan-status-format.md`).
 
 Sources (oldest first):
