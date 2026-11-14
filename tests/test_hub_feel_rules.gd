@@ -184,10 +184,10 @@ func test_p2_joins_from_the_keyboard() -> void:
 	await get_tree().process_frame
 
 
-func test_escape_held_quits_and_a_tap_does_not() -> void:
+func test_escape_held_opens_the_power_menu_and_a_tap_does_not() -> void:
 	var hub := await _hub()
 	var quit := [false]
-	hub.quitting.connect(func() -> void: quit[0] = true)
+	hub.power_menu_opened.connect(func() -> void: quit[0] = true)
 	var k := _key_of("launcher_quit")
 	assert_object(k).is_not_null()
 	k.pressed = true
@@ -198,7 +198,7 @@ func test_escape_held_quits_and_a_tap_does_not() -> void:
 	Input.parse_input_event(k)
 	await get_tree().process_frame
 	_step(hub, 10)
-	assert_bool(quit[0]).is_false()   # a tap never quits
+	assert_bool(quit[0]).is_false()   # a tap never opens the power menu
 	k.pressed = true
 	Input.parse_input_event(k)
 	await get_tree().process_frame
@@ -306,10 +306,10 @@ func _release_pad0() -> void:
 
 
 ## Holds Select and Start on pad 0 (`select_first`: Select `gap` frames before Start, else Start first)
-## for `seconds`, stepping the hub at 60 fps. Returns whether the hub quit.
+## for `seconds`, stepping the hub at 60 fps. Returns whether the power menu opened.
 func _hold_select_start(hub: Node3D, seconds: float, select_first: bool = true, gap: int = 0) -> bool:
 	var quit := [false]
-	hub.quitting.connect(func() -> void: quit[0] = true)
+	hub.power_menu_opened.connect(func() -> void: quit[0] = true)
 	var first := JOY_BUTTON_BACK if select_first else JOY_BUTTON_START
 	var second := JOY_BUTTON_START if select_first else JOY_BUTTON_BACK
 	await _pad_on(0, first, true)
@@ -319,12 +319,12 @@ func _hold_select_start(hub: Node3D, seconds: float, select_first: bool = true, 
 	return quit[0]
 
 
-func test_select_start_held_past_the_gesture_never_quits_or_changes_the_character() -> void:
+func test_select_start_held_past_the_gesture_never_opens_the_power_menu_or_changes_the_character() -> void:
 	var hub := await _hub()
 	var was := Roster.pick(Players.P1)
 	var hold := maxf(hub.QUIT_HOLD, 2.0) + 1.0   # past the quit hold and the games' 2 s gesture
 	assert_bool(await _hold_select_start(hub, hold)).is_false()
-	assert_bool(hub._quitting).is_false()
+	assert_bool(hub.power_menu.is_open()).is_false()
 	assert_float(hub.quit_meter.progress).is_equal(0.0)   # no badge either: Start does nothing
 	assert_str(Roster.pick(Players.P1)).is_equal(was)
 	assert_int(hub.refusals).is_equal(0)
@@ -333,7 +333,7 @@ func test_select_start_held_past_the_gesture_never_quits_or_changes_the_characte
 	assert_str(Roster.pick(Players.P1)).is_equal(was)   # letting go never lands the change late
 
 
-func test_select_start_in_any_order_never_quits_or_changes_the_character() -> void:
+func test_select_start_in_any_order_never_opens_the_power_menu_or_changes_the_character() -> void:
 	var hub := await _hub()
 	var was := Roster.pick(Players.P1)
 	for order: Array in [[true, 3], [false, 3], [true, 0]]:   # Select 3 frames early, Start first, together
@@ -343,10 +343,10 @@ func test_select_start_in_any_order_never_quits_or_changes_the_character() -> vo
 		_step(hub, 10)
 
 
-func test_letting_go_of_select_first_still_needs_start_released_to_quit() -> void:
+func test_letting_go_of_select_first_still_needs_start_released_to_open_the_power_menu() -> void:
 	var hub := await _hub()
 	var quit := [false]
-	hub.quitting.connect(func() -> void: quit[0] = true)
+	hub.power_menu_opened.connect(func() -> void: quit[0] = true)
 	await _pad_on(0, JOY_BUTTON_BACK, true)
 	await _pad_on(0, JOY_BUTTON_START, true)
 	_step(hub, 60)
@@ -361,17 +361,17 @@ func test_letting_go_of_select_first_still_needs_start_released_to_quit() -> voi
 	await _pad_on(0, JOY_BUTTON_START, false)
 
 
-func test_start_alone_on_the_pad_still_ticks_shows_the_badge_and_quits_when_held() -> void:
+func test_start_alone_on_the_pad_still_ticks_shows_the_badge_and_opens_the_power_menu_when_held() -> void:
 	var hub := await _hub()
 	var quit := [false]
-	hub.quitting.connect(func() -> void: quit[0] = true)
+	hub.power_menu_opened.connect(func() -> void: quit[0] = true)
 	var was := Roster.pick(Players.P1)
 	await _pad_on(0, JOY_BUTTON_START, true)
 	_step(hub, 10)
 	assert_float(hub.quit_meter.progress).is_greater(0.0)   # the badge's ring fills
 	await _pad_on(0, JOY_BUTTON_START, false)
 	_step(hub, 10)
-	assert_bool(quit[0]).is_false()   # a tap never quits
+	assert_bool(quit[0]).is_false()   # a tap never opens the power menu
 	assert_float(hub.quit_meter.progress).is_equal(0.0)
 	await _pad_on(0, JOY_BUTTON_START, true)
 	_step(hub, int(hub.QUIT_HOLD * 60.0) + 10)

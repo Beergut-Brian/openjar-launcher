@@ -32,7 +32,7 @@ fi
 
 (`""` means "the default source", the GitHub repo.) `install.sh` refuses to touch a folder that
 has a `.release` marker, so once the rebuild ships, `update.sh`'s download replaces the browser
-version and nothing fights over it. `shortcuts.py` makes no Steam tile for it (no `binary`), so
+version and nothing fights over it. There is no Steam on the TV box (2026-11-14), so
 Smash Party lives only inside the launcher, which is what we want.
 
 The box needs `python3` (Bazzite has it) and a browser (below).

@@ -191,7 +191,7 @@ All paths are relative to the manifest's folder.
   "args": ["--fullscreen"],
   "grid": "store/grid.png", "hero": "store/hero.png", "clip": "store/clip.mp4",
   "jar": "store/jar.glb",
-  "dev": false }
+  "dev": false, "profiles": true }
 ```
 
 | Key | Type | Required | Meaning |
@@ -205,6 +205,7 @@ All paths are relative to the manifest's folder.
 | `jar` | string | no | the game's own tiny 3D world, shown inside its jar: a `.glb` / `.gltf` or a self-contained `.tscn` (see "Jar world" below). Missing or unusable → the generated fallback world |
 | `grid` | string | no | 600x900 poster. Only used when there is no `jar`: its average colour tints the fallback world and it hangs as a small backdrop at the back of the jar |
 | `hero`, `clip` | string | no | 920x430 banner / looping clip (not used yet) |
+| `profiles` | bool | no (default `true`) | `false`: the entry does not speak the handshake below (an emulator frontend such as RetroDECK, `["flatpak", "run", "net.retrodeck.retrodeck"]`): it gets none of the launcher's arguments, only `command` / `binary` and `args`. With no `jar`, it shows the stock Retro Games world (a pixel cartridge) |
 | `dev` | bool | no (default `false`) | only shown when the dev toggle is on, and then **instead of** that game's stable build: one jar per game (same `slug`; a dev slug ending `-dev` counts as the game without it), its dev build if installed, else its stable one (playtest 2026-11-12); the jar gets a dark lid with a beacon |
 
 A manifest that is not valid JSON, is not an object, has neither a usable `binary` nor
@@ -241,6 +242,7 @@ The launcher starts an entry with `OS.create_process`:
 
 - `binary`: `<folder>/<binary> --profile=<id> --p1-char=<c1> --p2-char=<c2> <args...>`
 - `command`: `<program> <command[1:]...> --profile=<id> --p1-char=<c1> --p2-char=<c2> <args...>`
+- `"profiles": false`: `<program> <command[1:]...> <args...>` (or `<binary> <args...>`), nothing else
 
 `<id>` is `p1` or `p2`: the save profile of the Jarling that jumped into the jar. In solo play that
 is the profile player 1 picked (B); with two players it is the profile of whoever pressed A. A
@@ -265,7 +267,9 @@ While the game runs the launcher hides, ignores input and idles. With `MINIMIZE_
 (const in `hub.gd`, default `true`) it also minimises its own window, and restores its
 previous mode (fullscreen) and focus when the game exits. It never changes the game's window. When the process exits (any exit
 code) the launcher shows the hub again, the Jarling pops back out of that jar and the lid drops back
-on. Start in the hub quits the launcher with exit code 0 (back to Steam).
+on. Start held in the hub opens the power menu (Back / Sleep / Shut down, `PowerMenu`, through
+`PowerActions`); the launcher never quits on the TV (it is the box's home screen, 2026-11-14). Only a
+run with `--allow-quit` (or `OPENJAR_ALLOW_QUIT=1`) can exit, with code 0, from that menu.
 
 **Launch sequence.** A at a jar does not start the game at once: it starts `LaunchSequence`
 (`scripts/hub/launch_sequence.gd`, pure, about 2.3 s): jar rattles → lid spins off → Jarling
@@ -302,7 +306,10 @@ func voice_step(delta: float) -> void            # counts the settles down (from
 func apply_characters(animate := false, always_lead := false) -> void   # dress Jarlings as the picks
 func current_chars() -> Dictionary               # {P1: id, P2: id} for --p1-char / --p2-char
 func join_second_player() -> void                # P2 takes the Jarling player 1 did not pick
-func quit_to_steam() -> void
+func open_power_menu() -> void                   # Start held QUIT_HOLD s (signal power_menu_opened)
+func close_power_menu(sound := "ui_back") -> void   # Back / B / a fresh Start tap (signal power_menu_closed)
+func quit_launcher() -> void                     # the --allow-quit dev escape: exit 0 (signal quitting)
+var power: PowerActions                          # sleep() / shut_down() / quit(tree); tests swap in a fake
 ```
 
 Input: the stick walks freely (see GAME.md "Controls"). A at a jar launches it with the profile of

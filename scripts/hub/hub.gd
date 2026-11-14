@@ -2,8 +2,10 @@
 ## Flow: boot → hub (standing at the last game's jar) → A → launch animation (LaunchSequence: lid
 ## spins off, Jarling leaps in, camera dives into the jar's tiny world) → (game runs) → pop back out.
 ## Owns the Save keys (LauncherState), the manifest list and the child process.
-## Holding Start for QUIT_HOLD s quits to Steam (exit code 0), except while a game runs (K-02), and
-## never while Select is held: Select + Start is the games' solo gesture (CHORD_S, 2026-11-14).
+## Holding Start for QUIT_HOLD s opens the power menu (Back, Sleep, Shut down; NS-1: the TV box has no
+## Steam, the launcher is its home screen), except while a game runs (K-02), and never while Select is
+## held: Select + Start is the games' solo gesture (CHORD_S, 2026-11-14). Only a dev run started with
+## --allow-quit (or OPENJAR_ALLOW_QUIT=1) can leave the process, from a fourth button in that menu.
 extends Node3D
 
 enum Screen { HUB, RUNNING }
@@ -44,8 +46,11 @@ const CHANGE_SOUND := "chooser_swap"  # the chooser's swap sound (a puff and a "
 ## since presses are ignored mid-swap (0.39 s, longer than the settle). Fast scrolling says only the
 ## one you stop on; standing still says nothing more.
 const SAY_SETTLE := 0.3
-## K-02: Start must be held this long to leave the launcher; a tap only ticks and shows the badge.
+## K-02: Start must be held this long to open the power menu; a tap only ticks and shows the badge.
 const QUIT_HOLD := 1.5
+## The dev-only escape: with this on the command line (or OPENJAR_ALLOW_QUIT=1) the power menu also
+## has a quit button that exits with code 0. Never on the TV (the box service would restart it anyway).
+const ALLOW_QUIT_ARG := "--allow-quit"
 ## C-14: a `command` game (Smash Party in a kiosk browser) has no quit of its own a kid can reach,
 ## so while one runs, holding Start this long closes it and you come home. Longer than QUIT_HOLD,
 ## so a pause press in the game never does it. Godot games quit themselves and are never stopped.
@@ -67,7 +72,9 @@ const LIGHT_DIR := Vector3(0.42, 0.46, -1.0)
 const REFUSE_BAR_HEIGHT := 36.0           # px: the refusal bar along the bottom edge (one half per player)
 
 signal launched(slug: String, profile_id: String)
-signal quitting
+signal quitting                          # the dev quit (--allow-quit) only
+signal power_menu_opened
+signal power_menu_closed
 
 var screen: Screen = Screen.HUB
 var root_dir := ""
@@ -110,6 +117,11 @@ var _stopping := false
 var _quitting := false
 var _demo_quit_until := 0.0
 var quit_meter: QuitMeter
+var power_menu: PowerMenu
+## The box's power, behind one seam (tests swap in a fake; test and demo runs are dry runs).
+var power := PowerActions.new()
+var allow_quit := false
+var _menu_start_needs_release := false   # Start is still down from the hold that opened the menu
 var version_label: Label
 var refusals := 0                       # refusal boops so far (tests read it)
 var bar_flashes := 0                    # refusal bar flashes so far (tests read it)
@@ -198,6 +210,18 @@ func _ready() -> void:
 		refuse_bars.append(bar)
 	quit_meter = QuitMeter.new()
 	layer.add_child(quit_meter)
+	var args := OS.get_cmdline_args() + OS.get_cmdline_user_args()
+	allow_quit = allow_quit or args.has(ALLOW_QUIT_ARG) or OS.get_environment("OPENJAR_ALLOW_QUIT") == "1"
+	if Roster.is_test_run(args) or not demo.is_empty():
+		power.dry_run = true   # a test or a scripted run never suspends or powers off the box
+	if Roster.is_test_run(args):
+		power.dry_quit = true  # and a test never ends the test runner (a scripted run may: --allow-quit)
+	power_menu = PowerMenu.new()
+	layer.add_child(power_menu)
+	power_menu.set_allow_quit(allow_quit)
+	power_menu.chosen.connect(_on_power_chosen)
+	if allow_quit:
+		print("launcher: %s: the power menu has a dev quit (exit 0)" % ALLOW_QUIT_ARG)
 	version_label = Label.new()   # for grown-ups: which build is on the TV (the release tag)
 	version_label.name = "Version"
 	version_label.text = version_text()
@@ -308,9 +332,21 @@ func cold_start_marks() -> String:
 	return ", ".join(parts)
 
 
-## Start, held: the badge's ring fills and at QUIT_HOLD s the launcher quits. A tap ticks and lets go.
-## Ignored while a game runs. True on the frame it quits.
+## Start, held: the badge's ring fills and at QUIT_HOLD s the power menu opens. A tap ticks and lets
+## go. Ignored while a game runs. With the menu open, a fresh Start press closes it (like Back).
+## True on the frame the menu opens.
 func update_quit(down: bool, delta: float) -> bool:
+	if power_menu.is_open():
+		if _menu_start_needs_release:
+			_menu_start_needs_release = down
+		elif down and screen != Screen.RUNNING:
+			_menu_start_needs_release = true
+			close_power_menu()
+		quit_meter.progress = 0.0
+		_quit_combo.update(false, false, delta)
+		_quit_down = down
+		_quit_needs_release = down   # the press that closed it never starts a new hold
+		return false
 	if screen == Screen.RUNNING or _quitting:
 		down = false
 	if _quit_needs_release:
@@ -322,7 +358,7 @@ func update_quit(down: bool, delta: float) -> bool:
 	var go := _quit_combo.update(down, down, delta)
 	quit_meter.progress = 1.0 if go else _quit_combo.progress()
 	if go:
-		quit_to_steam()
+		open_power_menu()
 	return go
 
 
@@ -352,15 +388,94 @@ func stop_game() -> void:
 		OS.kill(pid)
 
 
-func quit_to_steam() -> void:
+## The power menu (NS-1). Focus starts on Back; the hub stops reading the Jarlings' input until it
+## closes. Opening it never stops a launch already playing: the jump is called off at GO instead.
+func open_power_menu() -> void:
+	if power_menu.is_open() or _quitting:
+		return
+	Audio.play("ui_confirm")
+	power_menu.open()
+	_menu_start_needs_release = true   # the hold that opened it is still down
+	cancel_say(Players.P1)
+	cancel_say(Players.P2)
+	for j in jarlings:
+		j.move_input = Vector2.ZERO
+	print("launcher: power menu open")
+	power_menu_opened.emit()
+
+
+func close_power_menu(sound: String = "ui_back") -> void:
+	if not power_menu.is_open():
+		return
+	if not sound.is_empty():
+		Audio.play(sound)
+	power_menu.close()
+	_input_from_ms = Time.get_ticks_msec() + RETURN_GRACE_MS / 3   # the A that closed it never also launches
+	print("launcher: power menu closed")
+	power_menu_closed.emit()
+
+
+## The menu's input, from either player's stick / D-pad / keys: left and right move, A picks (held on
+## Shut down), B or a fresh Start goes back.
+func _power_menu_input(delta: float) -> void:
+	var a_down := false
+	for p: int in [Players.P1, Players.P2]:
+		a_down = a_down or Input.is_action_pressed(Players.action(p, "action"))
+	if power_menu.holding():
+		if power_menu.update_confirm(a_down, delta):
+			return
+		if not power_menu.holding():
+			Audio.play("ui_move")   # let go before the ring filled: nothing happens, and it says so
+		return
+	for p: int in [Players.P1, Players.P2]:
+		var dir := 0
+		if Input.is_action_just_pressed(Players.action(p, "move_left")):
+			dir = -1
+		elif Input.is_action_just_pressed(Players.action(p, "move_right")):
+			dir = 1
+		if dir != 0:
+			Audio.play("ui_move" if power_menu.step(dir) else "ui_back")
+			return
+		if Input.is_action_just_pressed(Players.action(p, "jump")):
+			close_power_menu()
+			return
+		if Input.is_action_just_pressed(Players.action(p, "action")):
+			Audio.play("ui_confirm" if power_menu.focused() != PowerMenu.Item.BACK else "ui_move")
+			power_menu.press()
+			return
+
+
+func _on_power_chosen(item: PowerMenu.Item) -> void:
+	match item:
+		PowerMenu.Item.BACK:
+			close_power_menu()
+		PowerMenu.Item.SLEEP:
+			Save.flush()
+			close_power_menu("")   # wake up in the hub, not in the menu (A already said ui_confirm)
+			power.sleep()
+			_input_from_ms = Time.get_ticks_msec() + RETURN_GRACE_MS
+		PowerMenu.Item.SHUT_DOWN:
+			Audio.play("ui_confirm")
+			Save.flush()
+			power.shut_down()
+			close_power_menu("")
+		PowerMenu.Item.QUIT:
+			quit_launcher()
+
+
+## The dev-only escape (--allow-quit): exit code 0, logged. Never offered on the TV.
+func quit_launcher() -> void:
+	if not allow_quit or _quitting:
+		return
 	_quitting = true
 	Audio.play("ui_back")
 	Save.flush()
+	power_menu.close()
 	quitting.emit()
-	if not really_quit:
-		return   # tests
-	await get_tree().create_timer(0.25).timeout   # let the cue be heard
-	Audio.quit(0)
+	print("launcher: dev quit (%s), exit 0" % ALLOW_QUIT_ARG)
+	if really_quit:   # tests skip the wait (their PowerActions is a fake or a dry run)
+		await get_tree().create_timer(0.25).timeout   # let the cue be heard
+	power.quit(get_tree())
 
 
 # ---------------------------------------------------------------- jars
@@ -520,7 +635,10 @@ func _process(delta: float) -> void:
 	update_quit(start or _clock < _demo_quit_until, delta)
 	update_home(start, delta)
 	voice_step(delta)
-	if intro_playing():
+	if power_menu.is_open():
+		if screen == Screen.HUB:
+			_power_menu_input(delta)
+	elif intro_playing():
 		for p: int in [Players.P1, Players.P2]:
 			if Input.is_action_just_pressed(Players.action(p, "action")):
 				intro.skip()
@@ -535,11 +653,11 @@ func _process(delta: float) -> void:
 		for p: int in [Players.P1, Players.P2]:
 			if _pressed_now(p):
 				refuse(p)   # a launch is playing: A, B and the chooser wait, and say so
-	if not (screen == Screen.HUB and not launch.active):
+	if not (screen == Screen.HUB and not launch.active) or power_menu.is_open():
 		_change_pending = [-1.0, -1.0]   # a Select press waiting for its chord never lands later
 	for i in jarlings.size():
 		var j := jarlings[i]
-		j.hint_enabled = screen == Screen.HUB and not launch.active and j.is_held()
+		j.hint_enabled = screen == Screen.HUB and not launch.active and j.is_held() and not power_menu.is_open()
 		j.go_hint_enabled = j.hint_enabled and not intro_playing() and focus[i] >= 0 and not spots[focus[i]].empty
 	if launch.active:
 		for beat in launch.advance(delta):
@@ -683,10 +801,22 @@ func _player_of(event: InputEvent) -> int:
 
 
 ## Pad buttons and keys that no hub action uses (X, Y, the stick clicks, a stray key) still answer
-## with the refusal boop while the hub is on screen, so no button is ever silent. Guide is left to
-## Steam. LB / RB alone tick like Start does: they are half of the dev hold.
+## with the refusal boop while the hub is on screen, so no button is ever silent (with the power menu
+## open: the boop and the menu shakes). Guide is left alone (the box's own system button). LB / RB
+## alone tick like Start does: they are half of the dev hold.
 func _input(event: InputEvent) -> void:
 	if screen != Screen.HUB or _quitting or not event.is_pressed() or event.is_echo():
+		return
+	if power_menu != null and power_menu.is_open():
+		var bound: bool = event is InputEventJoypadButton and (event.button_index == JOY_BUTTON_GUIDE \
+				or event.button_index == CHANGE_BUTTON or event.button_index in _bound_buttons())
+		if event is InputEventKey:
+			for a in InputMap.get_actions():
+				if not str(a).begins_with("ui_") and InputMap.event_is_action(event, a, true):
+					bound = true
+		if not bound and (event is InputEventJoypadButton or event is InputEventKey):
+			Audio.play("ui_back")
+			power_menu.nudge()
 		return
 	if event is InputEventJoypadButton:
 		var b: int = event.button_index
@@ -876,7 +1006,7 @@ func _same_key_as_p1(action_name: String) -> bool:
 ## happy little cheer. Ignored while a launch is playing, so A spam never launches twice.
 func press_action(player: int) -> void:
 	var j := jarling_for(player)
-	if j == null or j.busy or launch.active or screen != Screen.HUB:
+	if j == null or j.busy or launch.active or screen != Screen.HUB or power_menu.is_open():
 		return
 	var f: int = focus[jarlings.find(j)]
 	if f < 0:
@@ -1000,11 +1130,16 @@ func _pose_launch() -> void:
 
 ## The GO beat: the animation is over, hand the TV to the game.
 func _start_game() -> void:
-	if _quitting:   # Start was held to the end during the launch: leave, never start a game behind us
+	if _quitting:   # the dev quit came during the launch: leave, never start a game behind us
 		launch.cancel()
 		return
 	var entry := _launch_spot.entry
 	var j := jarlings[_launcher_index]
+	if power_menu.is_open():   # the power menu opened mid-launch: the jump is called off, never a game behind it
+		print("launcher: power menu open at GO, %s not started" % entry.slug)
+		_dived = true
+		_play_return(j)
+		return
 	_dived = true
 	_flash.color.a = 1.0
 	print("launcher: starting %s %s" % [_launch_cmd.path, " ".join(_launch_cmd.args)])
@@ -1332,6 +1467,10 @@ func _run_demo() -> void:
 		match d[1]:
 			"intro": pass   # handled in _ready (wants_intro)
 			"holdstart": _demo_quit_until = _clock + float(d[2])   # hold Start this long (frames of the badge)
+			"power": open_power_menu()                            # the power menu, as if Start was held
+			"pnext": power_menu.step(1)                           # its focus one button right
+			"ppress": power_menu.press()                          # A on the focused button
+			"pconfirm": power_menu.confirm = float(d[2])         # a frame of the Shut down hold's ring
 			"wide": _intro_hold = true
 			"follow": _intro_hold = false
 			"go": _demo_goal[Players.P1] = clampi(int(d[2]), 0, spots.size() - 1)

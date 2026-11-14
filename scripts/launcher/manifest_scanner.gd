@@ -71,7 +71,8 @@ static func game_of(e: Dictionary) -> String:
 
 
 ## One folder's manifest as a normalised entry, or {} (with a warning) if it is unusable.
-## Entry keys: slug, name, version, dir, binary, command, args, grid, hero, clip, jar, dev.
+## Entry keys: slug, name, version, dir, binary, command, args, grid, hero, clip, jar, dev, profiles.
+## profiles: false for something that does not speak the --profile= handshake (an emulator, NS-2).
 ## binary/grid/hero/clip/jar are absolute ("" when absent); command/args are PackedStringArray.
 static func read_manifest(dir: String) -> Dictionary:
 	var path := dir.path_join(MANIFEST)
@@ -104,6 +105,7 @@ static func read_manifest(dir: String) -> Dictionary:
 		"clip": _rel_path(dir, data, "clip"),
 		"jar": _rel_path(dir, data, "jar"),
 		"dev": data.get("dev") is bool and data.dev,
+		"profiles": not (data.get("profiles") is bool and not data.profiles),
 	}
 	if data.has("args"):
 		if not _is_string_array(data.args):

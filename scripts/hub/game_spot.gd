@@ -65,7 +65,12 @@ func setup(e: Dictionary, i: int = 0, kind: int = -1) -> void:
 		accent = off_players(accent)   # V-08: green and red belong to the players
 		world = JarWorld.load_custom(e.get("jar", ""))
 		custom_world = world != null
-		if world == null:
+		if world == null and JarWorld.is_retro(e):
+			world_kind = JarWorld.RETRO
+			if art == null:
+				accent = JarWorld.RETRO_ACCENT
+			world = JarWorld.build_retro(accent)
+		elif world == null:
 			world_kind = kind if kind >= 0 else JarWorld.kind_for(slug)
 			world = JarWorld.build(world_kind, accent)
 	_build(world, null if custom_world else art)

@@ -1,5 +1,5 @@
-## K-02: Start leaves the launcher only when held (QUIT_HOLD s), so a five-year-old mashing it never
-## drops the TV back to Steam. While Start is down a round badge in the top corner shows an open
+## K-02: Start opens the power menu only when held (QUIT_HOLD s), so a five-year-old mashing it never
+## gets there by accident (NS-1: the launcher is the box's home screen, it never quits). While Start is down a round badge in the top corner shows an open
 ## door with a sunny ring filling round it; let go and it shrinks away, nothing happens. No words.
 class_name QuitMeter
 extends Control

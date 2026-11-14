@@ -4,7 +4,8 @@
 > the same Release pipeline, so it is also the template's first end-to-end test.
 
 ## Pitch
-One Steam tile, "Open Jar Games". It opens on a big, loud, fun animation: the jar opens, the
+The TV box's home screen: the box boots straight into it, full screen, and a box service starts it
+again if it ever exits (no Steam; producer note 2026-11-14 below). It opens on a big, loud, fun animation: the jar opens, the
 roster of characters tumbles out (Jeff and Chuck for now), the logo lands with a thump. Then a
 row of game cards. Pick one, it launches. When the game quits, you are back here.
 
@@ -27,7 +28,7 @@ is no shortcut that runs you to a jar.
 | B | Solo: switch save profile (you stay put and become that profile's pick). Two players: a cheer |
 | Select / Back (Tab or `/` on keys) | Change your character in place: poof, the next one pops out, its name over your head. Two players: the other's pick is skipped |
 | Hold LB + RB for 1 s | Toggle showing the `(dev)` builds (their jars wear a dark lid). Every launcher start shows main-branch (stable) games only; the toggle lasts for that run (Kaden 2026-11-10) |
-| Start (hold 1.5 s) | Quit to Steam. A badge with an open door shows while held and its ring fills; a tap only ticks. Never while Select is held (Select + Start is the games' solo gesture) |
+| Start (hold 1.5 s) | Opens the power menu: Back (focused), Sleep (a moon), Shut down (the power sign; hold A on it until its ring fills). Pictures, no words. B or a Start tap closes it. A badge with an open door shows while held and its ring fills; a tap only ticks. Never while Select is held (Select + Start is the games' solo gesture) |
 | (P2's pad goes away) | P2 drops out: a "bye-bye" blip, their Jarling hops and tags along again |
 
 ## Core loop
@@ -66,7 +67,7 @@ Fixed 2D UI at 1080p.
 | Reviewer | yes | |
 
 ## First playable
-Launcher boots on the TV from a Steam tile, shows the intro once, shows cards for whatever is
+Launcher boots on the TV (the box's home screen since 2026-11-14), shows the intro once, shows cards for whatever is
 installed (Smash Party via its kiosk shortcut counts), launches one, comes back. Tag `v0.1.0`.
 
 ## Out of scope
@@ -90,8 +91,8 @@ installed (Smash Party via its kiosk shortcut counts), launches one, comes back.
 - 2026-11-09: B on the card row opens the profile picker (B in the picker goes back). That is the
   only way back to the picker after boot.
 - 2026-11-09: no games installed shows one empty grey card; A on it plays `ui_back` and wobbles.
-- 2026-11-09: Start quits to Steam from every launcher screen (intro, picker, cards), not only
-  the card row. Ignored while a game runs.
+- 2026-11-09: Start works from every launcher screen (intro, picker, cards), not only the card row.
+  Ignored while a game runs. (It left the launcher then; since 2026-11-14 it opens the power menu, NS-1.)
 - 2026-11-09: last card is remembered by `slug`, not position, so installs/removals do not shift it.
 - 2026-11-09: while a game runs the launcher minimises its own window and restores it (fullscreen,
   foreground) when the game exits, so two fullscreen windows never fight for the TV. Switch:
@@ -131,7 +132,8 @@ installed (Smash Party via its kiosk shortcut counts), launches one, comes back.
   profile's pick. Both profiles start as Jeff + Chuck, so until someone changes one, B looks like a
   pop in place.
 
-- 2026-11-10 (gap-close): Start has to be **held 1.5 s** to quit to Steam (was one press). A
+- 2026-11-10 (gap-close): Start has to be **held 1.5 s** (was one press; since 2026-11-14 the hold opens the
+  power menu, NS-1, where it used to leave the launcher). A
   five-year-old finds Start fast; a tap now only ticks and shows the door badge, which shrinks away on
   release. Mashing never adds up (each release starts over). Still ignored while a game runs. Kaden
   can ask for one-press back. This leaves three buttons that matter (stick, A, Select); B (a profile
@@ -157,11 +159,45 @@ installed (Smash Party via its kiosk shortcut counts), launches one, comes back.
 - 2026-11-10 (launch-ready): when P2's pad goes away their Jarling hops and goes back to tagging along,
   with its own sound (`player_leave`, two falling blips), so dropping out is never silent. The chooser's
   swap has its own sound too (`chooser_swap`, a puff and a "ta!"), no longer the jar's `intro_pop`.
-- 2026-11-10 (launch-ready): if the Start hold completes during the launch animation, the launcher quits
-  and the game is never started behind it.
+- 2026-11-10 (launch-ready): if the Start hold completes during the launch animation, the game is never
+  started behind it (2026-11-14: the power menu opens and the jump is called off at GO; the Jarling pops
+  back out).
 - 2026-11-10 (launch-ready): the build's version (the release tag, stamped into `config/version` by
   release.yml) sits small and faint in the bottom-right corner, for grown-ups; local builds say
   `v0.0.0-local`. The dev builds' lid is charcoal and nearly matte, so it reads dark in the sunset.
+
+## Producer note 2026-11-14: no Steam on the TV box (Kaden; supersedes the Steam tile sections)
+
+Kaden, live chat 2026-11-14:
+
+> "Steam will not run on the TV box. Only our games and some emulators."
+> D1 a: no Steam, the box boots straight into the launcher. D2: "emulators through RetroDECK, as a jar
+> in the launcher."
+
+This supersedes every "Steam tile" and "quit to Steam" above and in `PLAN-STATUS.md` (C-01, C-15, K-02).
+The launcher is the box's home screen: it starts at login, full screen, and a box service restarts it if
+it ever exits. There is nothing to quit to, so:
+
+- **NS-1, power menu.** Holding Start 1.5 s (the same hold and door badge) opens a small menu instead of
+  quitting: **Back** (focused when it opens, so an accident is one A away), **Sleep** (a moon:
+  `systemctl suspend`), **Shut down** (the power sign: `systemctl poweroff`, only after A is held on it
+  1.5 s while a ring fills; let go early and nothing happens). Big round pictures, nothing to read. Left /
+  right move, A picks, B or a fresh Start tap goes back; every press has a sound. Works on every launcher
+  screen (intro, hub, mid-launch: the jump is called off), ignored while a game runs (K-02). The power
+  calls go through one seam, `PowerActions` (`scripts/launcher/power_actions.gd`); test and demo runs are
+  dry runs. Sleep closes the menu first, so the box wakes up in the hub.
+- **Dev-only escape.** `--allow-quit` on the command line (or `OPENJAR_ALLOW_QUIT=1`) adds a fourth button
+  (the badge's open door) that exits the process with code 0 and logs `launcher: dev quit`. For desktop
+  testing only; never on the TV (the box service would start it again anyway).
+- **NS-2, emulator jar.** RetroDECK is a jar: a manifest with `command` (e.g.
+  `["flatpak", "run", "net.retrodeck.retrodeck"]`), no `binary`, and `"profiles": false`. It launches,
+  hides the hub while it runs and brings it back when the process exits, exactly like a game, and the
+  Start 2 s home hold closes it like any `command` game. `"profiles": false` means none of the launcher's
+  own arguments are passed (no `--profile=`, no `--p1-char=` / `--p2-char=`), only the command and the
+  manifest's `args`. With no `jar` of its own it gets the stock **Retro Games** world: a plain chunky game
+  cartridge built from pixel blocks with a little pixel heart on its label, on a pixel-checker floor (no
+  logos, no "RetroDECK", no words).
+- **NS-3.** No "quit to Steam" left in the UI, hints or docs.
 
 ## Playtest 2026-11-12 changes (Kaden; these supersede the sections above)
 Kaden: "Players should be able to walk around independently. Right now we're stuck together. Either
