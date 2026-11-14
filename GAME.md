@@ -75,6 +75,7 @@ installed (Smash Party via its kiosk shortcut counts), launches one, comes back.
 - Anything a kid has to read.
 
 ## Decisions made without Kaden
+- 2026-11-14 (Gary): FR-3 decided. In the hub the D-pad and stick only walk (the standing rule), so the D-pad never cycles the chooser; the chooser stays on Select, on the joined player's own pad. There is no ready state, so B has nothing to un-ready (A at a jar launches; B during a launch is a refusal). Kids never meet a menu, and the walking rule stays simple. Kaden can reverse this in chat.
 - 2026-11-09 (Gary): a game without its own `jar` world keeps its poster as a small card behind the generated diorama, so games stay tell-apart-able until each ships its jar.
 - 2026-11-09 (Gary): the spun-off lid landing on the other Jarling's head is a one-time joke; it's back on the jar when you return.
 - 2026-11-09 (Gary): P1 keeps the profile Jarling they picked, P2 gets the other; the ring colour shows the player (green P1, red P2).
