@@ -58,6 +58,7 @@ const RETURN_BARKS := ["win", "join", "cheer"]
 const SUN_DIR := Vector3(0.42, 0.2, -1.0)   # the sun you see: low behind the jars, a little to the right
 ## The light itself comes from higher up on the same bearing, so shadows stay short and crisp.
 const LIGHT_DIR := Vector3(0.42, 0.46, -1.0)
+const REFUSE_BAR_HEIGHT := 36.0           # px: the refusal bar along the bottom edge (one half per player)
 
 signal launched(slug: String, profile_id: String)
 signal quitting
@@ -103,7 +104,11 @@ var _demo_quit_until := 0.0
 var quit_meter: QuitMeter
 var version_label: Label
 var refusals := 0                       # refusal boops so far (tests read it)
-var _refused_frame := -1
+var bar_flashes := 0                    # refusal bar flashes so far (tests read it)
+var _refused_frame := { Players.P1: -1, Players.P2: -1 }
+## A refused press when that player's Jarling can't be seen (the intro, inside a jar): a bar along
+## the bottom edge in their colour blinks, P1 on the left half, P2 on the right. Never words.
+var refuse_bars: Array[ColorRect] = []
 var _bound_cache: Array[int] = []
 var really_quit := true                  # tests turn this off to see the hold without quitting
 var _intro := 0.0
@@ -171,6 +176,18 @@ func _ready() -> void:
 	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_flash.color = Color(1, 1, 1, 0)
 	layer.add_child(_flash)
+	for p: int in [Players.P1, Players.P2]:
+		var bar := ColorRect.new()
+		bar.name = "RefuseBar%d" % (p + 1)
+		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bar.anchor_left = 0.5 * p
+		bar.anchor_right = 0.5 * (p + 1)
+		bar.anchor_top = 1.0
+		bar.anchor_bottom = 1.0
+		bar.offset_top = -REFUSE_BAR_HEIGHT
+		bar.color = Color(Players.COLOR[p], 0.0)
+		layer.add_child(bar)
+		refuse_bars.append(bar)
 	quit_meter = QuitMeter.new()
 	layer.add_child(quit_meter)
 	version_label = Label.new()   # for grown-ups: which build is on the TV (the release tag)
@@ -500,7 +517,7 @@ func _process(delta: float) -> void:
 				intro.skip()
 				break
 			if _pressed_now(p, false):
-				refuse()   # B or the chooser while the intro plays: only A skips it, and says so
+				refuse(p)   # B or the chooser while the intro plays: only A skips it, and says so
 	elif screen == Screen.HUB and not launch.active and Time.get_ticks_msec() >= _input_from_ms:
 		_read_players()
 		if _dev_combo.update(Input.is_action_pressed("launcher_lb"), Input.is_action_pressed("launcher_rb"), delta):
@@ -508,7 +525,7 @@ func _process(delta: float) -> void:
 	elif screen == Screen.HUB and launch.active:
 		for p: int in [Players.P1, Players.P2]:
 			if _pressed_now(p):
-				refuse()   # a launch is playing: A, B and the chooser wait, and say so
+				refuse(p)   # a launch is playing: A, B and the chooser wait, and say so
 	for i in jarlings.size():
 		var j := jarlings[i]
 		j.hint_enabled = screen == Screen.HUB and not launch.active and j.is_held()
@@ -543,7 +560,7 @@ func _read_players() -> void:
 			v = _demo_steer(player, j)
 		if j.busy:
 			if change or _pressed_now(player, true, false):
-				refuse()   # mid-jump or mid-swap: the press is heard as a "not now"
+				refuse(player)   # mid-jump or mid-swap: the press is heard as a "not now"
 			continue
 		j.move_input = v
 		if Input.is_action_just_pressed(Players.action(player, "action")):
@@ -568,15 +585,45 @@ func _pressed_now(player: int, with_action: bool = true, change: bool = true) ->
 	return hit
 
 
-## A press that does nothing says so: the launcher's "can't do that" boop (ui_back, CUES.md).
-## At most once a frame, however many buttons were mashed together.
-func refuse() -> void:
+## A press that does nothing says so, out loud and on screen (CLAUDE.md #7): the launcher's "can't
+## do that" boop (ui_back, CUES.md), and that player's Jarling answers. Idle, it shakes its head in
+## place; busy (mid-jump, mid-swap, or a launch is playing), its ring blinks; out of sight (the intro, inside a
+## jar), the player's bar along the bottom edge blinks. About 0.3 s, and nobody is ever moved.
+## At most once a frame per player, however many buttons were mashed together.
+func refuse(player: int = Players.P1) -> void:
 	var frame := Engine.get_process_frames()
-	if frame == _refused_frame:
+	if frame == _refused_frame[player]:
 		return
-	_refused_frame = frame
+	_refused_frame[player] = frame
 	refusals += 1
 	Audio.play("ui_back")
+	var j := jarling_for(player)
+	if j == null or intro_playing() or not j.ring_shown():
+		flash_bar(player)
+	elif j.busy or j.swapping or launch.active:
+		j.flash()
+	else:
+		j.shake()
+
+
+## The refusal bar for `player`: on at once, then gone again by HubJarling.REFUSE_SECONDS.
+func flash_bar(player: int) -> void:
+	bar_flashes += 1
+	var bar := refuse_bars[player]
+	if bar.has_meta("tween"):
+		(bar.get_meta("tween") as Tween).kill()
+	bar.color = Color(Players.COLOR[player], 1.0)   # on at once, the same frame as the boop
+	var t := bar.create_tween()
+	t.tween_interval(HubJarling.REFUSE_SECONDS * 0.35)
+	t.tween_property(bar, "color:a", 0.0, HubJarling.REFUSE_SECONDS * 0.65)
+	bar.set_meta("tween", t)
+
+
+## Which player a raw event belongs to: the pad's owner, else P1 (keys no action uses, a stray pad).
+func _player_of(event: InputEvent) -> int:
+	if event is InputEventJoypadButton and Players.device_of(Players.P2) == event.device:
+		return Players.P2
+	return Players.P1
 
 
 ## Pad buttons and keys that no hub action uses (X, Y, the stick clicks, a stray key) still answer
@@ -591,12 +638,12 @@ func _input(event: InputEvent) -> void:
 			if b in [JOY_BUTTON_LEFT_SHOULDER, JOY_BUTTON_RIGHT_SHOULDER]:
 				Audio.play("ui_move")
 			return
-		refuse()
+		refuse(_player_of(event))
 	elif event is InputEventKey:
 		for a in InputMap.get_actions():
 			if not str(a).begins_with("ui_") and InputMap.event_is_action(event, a, true):
 				return
-		refuse()
+		refuse(_player_of(event))
 
 
 ## Every joypad button some action in the input map uses (any device). Godot's built-in ui_* actions
@@ -633,7 +680,7 @@ func change_character(player: int) -> bool:
 	if j == null or screen != Screen.HUB:
 		return false
 	if j.busy or j.swapping or launch.active:
-		refuse()   # mid-swap (or mid-jump, or launching): "not now", never silence
+		refuse(player)   # mid-swap (or mid-jump, or launching): "not now", never silence
 		return false
 	var now := Roster.pick(player)
 	var to := Roster.next_free(player, 1)
