@@ -307,7 +307,7 @@ func apply_characters(animate := false, always_lead := false) -> void   # dress 
 func current_chars() -> Dictionary               # {P1: id, P2: id} for --p1-char / --p2-char
 func join_second_player() -> void                # P2 takes the Jarling player 1 did not pick
 func open_power_menu() -> void                   # Start held QUIT_HOLD s (signal power_menu_opened)
-func close_power_menu() -> void                  # Back / B / a fresh Start tap (signal power_menu_closed)
+func close_power_menu(sound := "ui_back") -> void   # Back / B / a fresh Start tap (signal power_menu_closed)
 func quit_launcher() -> void                     # the --allow-quit dev escape: exit 0 (signal quitting)
 var power: PowerActions                          # sleep() / shut_down() / quit(tree); tests swap in a fake
 ```

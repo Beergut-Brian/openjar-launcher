@@ -404,10 +404,11 @@ func open_power_menu() -> void:
 	power_menu_opened.emit()
 
 
-func close_power_menu() -> void:
+func close_power_menu(sound: String = "ui_back") -> void:
 	if not power_menu.is_open():
 		return
-	Audio.play("ui_back")
+	if not sound.is_empty():
+		Audio.play(sound)
 	power_menu.close()
 	_input_from_ms = Time.get_ticks_msec() + RETURN_GRACE_MS / 3   # the A that closed it never also launches
 	print("launcher: power menu closed")
@@ -450,14 +451,14 @@ func _on_power_chosen(item: PowerMenu.Item) -> void:
 			close_power_menu()
 		PowerMenu.Item.SLEEP:
 			Save.flush()
-			close_power_menu()   # wake up in the hub, not in the menu
+			close_power_menu("")   # wake up in the hub, not in the menu (A already said ui_confirm)
 			power.sleep()
 			_input_from_ms = Time.get_ticks_msec() + RETURN_GRACE_MS
 		PowerMenu.Item.SHUT_DOWN:
 			Audio.play("ui_confirm")
 			Save.flush()
 			power.shut_down()
-			close_power_menu()
+			close_power_menu("")
 		PowerMenu.Item.QUIT:
 			quit_launcher()
 
