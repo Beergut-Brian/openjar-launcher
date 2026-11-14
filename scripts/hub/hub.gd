@@ -2,7 +2,8 @@
 ## Flow: boot → hub (standing at the last game's jar) → A → launch animation (LaunchSequence: lid
 ## spins off, Jarling leaps in, camera dives into the jar's tiny world) → (game runs) → pop back out.
 ## Owns the Save keys (LauncherState), the manifest list and the child process.
-## Holding Start for QUIT_HOLD s quits to Steam (exit code 0), except while a game runs (K-02).
+## Holding Start for QUIT_HOLD s quits to Steam (exit code 0), except while a game runs (K-02), and
+## never while Select is held: Select + Start is the games' solo gesture (CHORD_S, 2026-11-14).
 extends Node3D
 
 enum Screen { HUB, RUNNING }
@@ -49,6 +50,11 @@ const QUIT_HOLD := 1.5
 ## so while one runs, holding Start this long closes it and you come home. Longer than QUIT_HOLD,
 ## so a pause press in the game never does it. Godot games quit themselves and are never stopped.
 const HOME_HOLD := 2.0
+## Select + Start held is the playtest solo gesture of the games (GAME.md, Gary 2026-11-14): while
+## Select is down the hub ignores Start (no quit, no home close, no badge, no sound) until Start is let
+## go. A Select press waits up to CHORD_S (or its own release) to see whether Start joins it; if it
+## does, the chooser does nothing either. A Select tap still changes the character on release.
+const CHORD_S := 0.1
 const FAIL_FAST_S := 4.0          # a game that ends this soon with an error never really started (PF-2)
 const STOP_GRACE := 3.0           # after asking a game to stop (TERM): kill it if it is still there
 ## A-05: the launching character's own voice on top of the beat sounds: a happy bark as it leaps
@@ -94,6 +100,8 @@ var _dev_combo := HoldCombo.new(1.0)
 var _quit_combo := HoldCombo.new(QUIT_HOLD)
 var _quit_down := false
 var _quit_needs_release := false         # Start still held from the game: let go before it counts
+var _start_masked := false               # Start went down with Select held: ignored until let go
+var _change_pending: Array[float] = [-1.0, -1.0]   # by player: chord window left on a Select press, < 0 none
 var _home_combo := HoldCombo.new(HOME_HOLD)
 var _started_ms := 0                     # when the running game started
 var last_return_failed := false          # the last game came straight back with an error (PF-2)
@@ -508,8 +516,9 @@ func pick_profile(id: String) -> void:
 func _process(delta: float) -> void:
 	_clock += delta
 	_run_demo()
-	update_quit(Input.is_action_pressed("launcher_quit") or _clock < _demo_quit_until, delta)
-	update_home(Input.is_action_pressed("launcher_quit"), delta)
+	var start := start_for_hub()
+	update_quit(start or _clock < _demo_quit_until, delta)
+	update_home(start, delta)
 	voice_step(delta)
 	if intro_playing():
 		for p: int in [Players.P1, Players.P2]:
@@ -519,13 +528,15 @@ func _process(delta: float) -> void:
 			if _pressed_now(p, false):
 				refuse(p)   # B or the chooser while the intro plays: only A skips it, and says so
 	elif screen == Screen.HUB and not launch.active and Time.get_ticks_msec() >= _input_from_ms:
-		_read_players()
+		_read_players(delta)
 		if _dev_combo.update(Input.is_action_pressed("launcher_lb"), Input.is_action_pressed("launcher_rb"), delta):
 			_toggle_dev()
 	elif screen == Screen.HUB and launch.active:
 		for p: int in [Players.P1, Players.P2]:
 			if _pressed_now(p):
 				refuse(p)   # a launch is playing: A, B and the chooser wait, and say so
+	if not (screen == Screen.HUB and not launch.active):
+		_change_pending = [-1.0, -1.0]   # a Select press waiting for its chord never lands later
 	for i in jarlings.size():
 		var j := jarlings[i]
 		j.hint_enabled = screen == Screen.HUB and not launch.active and j.is_held()
@@ -544,10 +555,10 @@ func _process(delta: float) -> void:
 
 ## Every stick, D-pad or key direction walks the Jarling (full tilt runs). Nothing snaps to a jar:
 ## you walk up to one and it comes into focus.
-func _read_players() -> void:
+func _read_players(delta: float = 0.0) -> void:
 	for player: int in [Players.P1, Players.P2]:
 		var j := jarling_for(player)
-		var change := _change_just_pressed(player)
+		var change := _chooser_step(player, _change_just_pressed(player), delta)
 		if j == null:
 			for a: String in Players.ACTIONS:   # P2 keys with no pad: any press joins
 				if Input.is_action_just_pressed(Players.action(player, a)) and not _same_key_as_p1(a):
@@ -573,6 +584,51 @@ func _read_players() -> void:
 				pick_profile(LaunchArgs.PROFILES[1 - index_of_profile(profile)])
 		if change:
 			change_character(player)
+
+
+## Start as the hub reads it: down, unless it went down (or stayed down) while Select was held. Then
+## it is the games' solo gesture and stays ignored until Start is let go, even if Select goes first.
+func start_for_hub() -> bool:
+	var down := Input.is_action_pressed("launcher_quit")
+	if not down:
+		_start_masked = false
+	elif select_held():
+		_start_masked = true
+	return down and not _start_masked
+
+
+## Is Select (Back / View, or a player's change key) held anywhere: either player's key or pad, or any
+## connected pad (a pad nobody has joined with yet still makes the gesture).
+func select_held() -> bool:
+	for p: int in [Players.P1, Players.P2]:
+		if Input.is_action_pressed(Players.action(p, "change")):
+			return true
+	var devices := Input.get_connected_joypads()
+	for p: int in [Players.P1, Players.P2]:
+		devices.append(Players.device_of(p))
+	for dev: int in devices:
+		if dev >= 0 and dev != Players.PARKED and Input.is_joy_button_pressed(dev, CHANGE_BUTTON):
+			return true
+	return false
+
+
+## The chooser's chord window. `edge`: Select just went down. True on the frame the change should
+## happen: the press has waited CHORD_S, or Select was let go, with no Start in the meantime. Start
+## down (or masked) drops the waiting press: Select + Start changes nobody.
+func _chooser_step(player: int, edge: bool, delta: float) -> bool:
+	if _start_masked or Input.is_action_pressed("launcher_quit"):
+		_change_pending[player] = -1.0
+		return false
+	if edge:
+		_change_pending[player] = CHORD_S
+		return false
+	if _change_pending[player] < 0.0:
+		return false
+	_change_pending[player] -= delta
+	if _change_pending[player] <= 0.0 or not _change_down[player]:
+		_change_pending[player] = -1.0
+		return true
+	return false
 
 
 ## Did `player` just press A or B (and, with `change`, the chooser button)? `change` reads the

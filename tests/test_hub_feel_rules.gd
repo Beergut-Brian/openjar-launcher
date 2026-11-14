@@ -294,3 +294,115 @@ func test_the_dpad_left_and_right_walk_and_never_change_the_character() -> void:
 		assert_float(moved if b == JOY_BUTTON_DPAD_RIGHT else -moved).is_greater(0.3)
 		assert_str(Roster.pick(Players.P1)).is_equal(was)
 	assert_int(hub.refusals).is_equal(0)
+
+
+## Select + Start (Gary, 2026-11-14, GAME.md): the games' solo gesture. In the hub, while Select is
+## held, Start does nothing: no quit, no badge, and the chooser does not change the character either,
+## whichever of the two went down first. Start alone is unchanged.
+
+func _release_pad0() -> void:
+	for b: int in [JOY_BUTTON_BACK, JOY_BUTTON_START]:
+		await _pad_on(0, b, false)
+
+
+## Holds Select and Start on pad 0 (`select_first`: Select `gap` frames before Start, else Start first)
+## for `seconds`, stepping the hub at 60 fps. Returns whether the hub quit.
+func _hold_select_start(hub: Node3D, seconds: float, select_first: bool = true, gap: int = 0) -> bool:
+	var quit := [false]
+	hub.quitting.connect(func() -> void: quit[0] = true)
+	var first := JOY_BUTTON_BACK if select_first else JOY_BUTTON_START
+	var second := JOY_BUTTON_START if select_first else JOY_BUTTON_BACK
+	await _pad_on(0, first, true)
+	_step(hub, gap)
+	await _pad_on(0, second, true)
+	_step(hub, int(seconds * 60.0))
+	return quit[0]
+
+
+func test_select_start_held_past_the_gesture_never_quits_or_changes_the_character() -> void:
+	var hub := await _hub()
+	var was := Roster.pick(Players.P1)
+	var hold := maxf(hub.QUIT_HOLD, 2.0) + 1.0   # past the quit hold and the games' 2 s gesture
+	assert_bool(await _hold_select_start(hub, hold)).is_false()
+	assert_bool(hub._quitting).is_false()
+	assert_float(hub.quit_meter.progress).is_equal(0.0)   # no badge either: Start does nothing
+	assert_str(Roster.pick(Players.P1)).is_equal(was)
+	assert_int(hub.refusals).is_equal(0)
+	await _release_pad0()
+	_step(hub, 30)
+	assert_str(Roster.pick(Players.P1)).is_equal(was)   # letting go never lands the change late
+
+
+func test_select_start_in_any_order_never_quits_or_changes_the_character() -> void:
+	var hub := await _hub()
+	var was := Roster.pick(Players.P1)
+	for order: Array in [[true, 3], [false, 3], [true, 0]]:   # Select 3 frames early, Start first, together
+		assert_bool(await _hold_select_start(hub, hub.QUIT_HOLD + 0.5, order[0], order[1])).is_false()
+		assert_str(Roster.pick(Players.P1)).is_equal(was)
+		await _release_pad0()
+		_step(hub, 10)
+
+
+func test_letting_go_of_select_first_still_needs_start_released_to_quit() -> void:
+	var hub := await _hub()
+	var quit := [false]
+	hub.quitting.connect(func() -> void: quit[0] = true)
+	await _pad_on(0, JOY_BUTTON_BACK, true)
+	await _pad_on(0, JOY_BUTTON_START, true)
+	_step(hub, 60)
+	await _pad_on(0, JOY_BUTTON_BACK, false)   # Select up, Start still held: still the gesture
+	_step(hub, int(hub.QUIT_HOLD * 60.0) + 30)
+	assert_bool(quit[0]).is_false()
+	await _pad_on(0, JOY_BUTTON_START, false)
+	_step(hub, 2)
+	await _pad_on(0, JOY_BUTTON_START, true)    # a fresh Start, no Select: the hold quits as before
+	_step(hub, int(hub.QUIT_HOLD * 60.0) + 10)
+	assert_bool(quit[0]).is_true()
+	await _pad_on(0, JOY_BUTTON_START, false)
+
+
+func test_start_alone_on_the_pad_still_ticks_shows_the_badge_and_quits_when_held() -> void:
+	var hub := await _hub()
+	var quit := [false]
+	hub.quitting.connect(func() -> void: quit[0] = true)
+	var was := Roster.pick(Players.P1)
+	await _pad_on(0, JOY_BUTTON_START, true)
+	_step(hub, 10)
+	assert_float(hub.quit_meter.progress).is_greater(0.0)   # the badge's ring fills
+	await _pad_on(0, JOY_BUTTON_START, false)
+	_step(hub, 10)
+	assert_bool(quit[0]).is_false()   # a tap never quits
+	assert_float(hub.quit_meter.progress).is_equal(0.0)
+	await _pad_on(0, JOY_BUTTON_START, true)
+	_step(hub, int(hub.QUIT_HOLD * 60.0) + 10)
+	assert_bool(quit[0]).is_true()
+	assert_str(Roster.pick(Players.P1)).is_equal(was)
+	assert_int(hub.refusals).is_equal(0)
+	await _pad_on(0, JOY_BUTTON_START, false)
+
+
+func test_a_select_tap_alone_still_changes_the_character() -> void:
+	var hub := await _hub()
+	var was := Roster.pick(Players.P1)
+	await _pad_on(0, JOY_BUTTON_BACK, true)
+	_step(hub, 2)
+	await _pad_on(0, JOY_BUTTON_BACK, false)
+	_step(hub, 1)
+	assert_str(Roster.pick(Players.P1)).is_not_equal(was)
+	assert_int(hub.refusals).is_equal(0)
+
+
+func test_select_start_while_a_command_game_runs_never_closes_it() -> void:
+	var hub := await _hub()
+	hub.screen = hub.Screen.RUNNING
+	hub._running_command = true
+	var stopped := [false]
+	await _pad_on(0, JOY_BUTTON_BACK, true)
+	await _pad_on(0, JOY_BUTTON_START, true)
+	for i in int((hub.HOME_HOLD + 0.5) * 60.0):
+		if hub.update_home(hub.start_for_hub(), DT):
+			stopped[0] = true
+	assert_bool(stopped[0]).is_false()   # the game's own solo gesture, not the hub's home hold
+	await _release_pad0()
+	hub._running_command = false
+	hub.screen = hub.Screen.HUB
