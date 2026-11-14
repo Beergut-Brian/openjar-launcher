@@ -1,70 +1,67 @@
-# Report: press-answers-adopt-1 (press-answers adoption lane)
+# Report: hub-refusal-1 (hub refusal feedback lane)
 
-Branch `feature/press-answers-adopt-1` (off `dev`; `git fetch origin && git merge origin/dev`: already up to date at
-`cbe8125`). Not pushed.
+Branch `feature/hub-refusal-1` (off `dev`; `git fetch origin && git merge origin/dev`: already up to date at `2d70a0b`).
+Not pushed.
 
-**Status: blocked. Nothing to adopt yet.** I changed no code, wrote no tests, took no frames and moved no
-PLAN-STATUS rows. Two of the brief's starting assumptions don't hold for this repo.
+## What changed
 
-## 1. The template fix is not on the template's `dev`
+A press the hub refuses was heard (`ui_back`) but not seen. CLAUDE.md #7 wants both. Now `refuse(player)` answers on
+the player who pressed, for about 0.3 s (`HubJarling.REFUSE_SECONDS`), and never moves anyone:
 
-- The fix is commit `9d99f29` ("template: every menu press answers (honk refusal + wobble)") in
-  `~/openjar/openjar-template`. It is only on the local branch `feature/template-press-answers-1`.
-- `git merge-base --is-ancestor 9d99f29 origin/dev` says it is **not** in `origin/dev`. The template's `dev` is at
-  `f737145`, the pause-door PR #16 merge.
-- In `origin/dev`, `menu_input.gd`, `menu_item.gd`, `icon_button.gd`, `lobby.gd`, `pause_menu.gd` and
-  `settings_panel.gd` have no refusal or wobble code (`git grep -i "refus|honk|wobble"` finds nothing).
-- I could not check GitHub: `ls-remote` needs credentials this box doesn't have.
+| That player's Jarling is... | Visible answer |
+| --- | --- |
+| idle (standing or walking) | `shake()`: a no-no head shake. The body tilts about its middle (`_flip.rotation.z`), so its position never changes. |
+| busy: mid-jump, mid-swap, or a launch is playing | `flash()`: its ring blinks white and pops bigger. The body is left alone, so the jump or swap isn't disturbed. |
+| out of sight: the intro, inside the jar after the leap, or no Jarling | `flash_bar()`: a 36 px bar in the player's colour (P1 green on the left half, P2 red on the right) along the bottom edge. It shows at once and is gone by 0.3 s. No words. |
 
-## 2. The launcher has no template menu kit and no menu screens
+- `scripts/hub/hub.gd`: `refuse(player)` (all 5 call sites pass the player; a raw pad button goes to the pad's owner,
+  stray keys go to P1), `flash_bar`, `refuse_bars`, `bar_flashes`, `REFUSE_BAR_HEIGHT`. It now fires once a frame
+  **per player** (it was once a frame for both), so two players mashing in the same frame each get an answer.
+- `scripts/hub/jarling.gd`: `shake()` now counts (`shakes`), restarts cleanly and lasts 0.3 s (it was 0.24 s). The
+  chooser's "nobody free" shake uses it too. New: `flash()`, `flashes`, `ring_flashing()`, `ring_shown()`.
+- Same refusal sound (`ui_back`); no audio, art, save, join or chooser-flow changes.
+- The launcher has no `docs/ui.md` and no template menu kit, so this is a hub-only change, as the brief expected.
 
-| Screen in the brief | In this game? | Notes |
-| --- | --- | --- |
-| Start menu / lobby (`lobby.gd`) | no | `scenes/main.tscn` boots straight into the 3D hub (`scenes/hub/hub.tscn`). The chooser is in-line in the hub (S5). |
-| Pause menu (`pause_menu.gd`) | no | `Game.gd` only pauses in `State.PLAYING`, and the launcher never starts a round. PLAN-STATUS FR-6 says the same: "The launcher has no menu". |
-| Settings (`settings_panel.gd`) | no | Not in the repo. `Save.gd` keeps only `LauncherState`. |
-| Leave question (`confirm_dialog.gd`) | no | You quit by holding Start or Escape (quit meter), with no dialog. |
-| `scenes/ui/kit/*`, `icon_button.gd` | no | `scenes/ui/` holds only `theme.tres`. The vendored `addons/openjar/ui/` is empty. |
-| **Hub** (this game's own screen; the template has nothing like it) | yes | Silent presses already refuse **with sound only** (below). |
+## Tests
 
-So the copy-and-merge step (goal 1) has nothing in this game to land in. The only adoption would be importing the
-whole lobby, pause and settings kit as new screens. That is a design change (GAME.md 2026-11-10: "the hub has no
-ready screen"), not a fix to adopt.
+`tests/test_hub_refusal.gd`, 6 tests. Each one checks that the refusal count goes up and that the shake or flash
+counter goes up:
+- unused pad button, idle → shake. It also checks the Jarling is upright again and hasn't moved.
+- P2's unused button → only P2's Jarling answers.
+- A mid-jump → ring blink, no shake. The blink is over after 0.3 s.
+- chooser mid-swap → ring blink.
+- B during a launch → ring blink before the leap; A after the leap → P1's bar.
+- B during the intro → P1's bar in P1's colour, faded after 0.3 s.
 
-## 3. The hub, the game's own screen (goal 2): sound yes, visual no
+The tests use a throwaway Save profile and picks file. `scripts/tools/test.sh` keeps all user data under `.scratch/`.
 
-`scripts/hub/hub.gd` `refuse()` already makes every press answer (FR-4, built and tested in
-`tests/test_hub_feel_rules.gd`): X, Y, stick clicks and stray keys; A, B and the chooser mid-jump, mid-swap,
-during the intro and during a launch. It plays `ui_back`, the game's documented "can't do that" cue (CUES.md), at most
-once a frame. LB and RB tick (`ui_move`) because together they are the dev hold.
+**Full suite on a clean import** (`.godot/` removed, then `scripts/tools/test.sh`): exit 0, **219 test cases** (213
+before), 0 failures, 0 errors. Output in `handoff/test-output.txt`.
 
-**Gap:** a refusal has **no visual**. CLAUDE.md #7 asks for a sound and a visual on every press, and the template
-pairs the honk with a wobble. I didn't add one, for three reasons:
-- `refuse()` doesn't know which player pressed. `_input` would need to map the event's device to a player first.
-- The obvious visual is `jarling.shake()`, a tween on `_flip.rotation.z`. Most refusals happen *because* that
-  Jarling is mid-jump, mid-swap or launching, and a shake on top of those animations needs care and a frame check.
-  That is hub feel code, which this brief puts out of bounds ("do not change gameplay code").
-- The template's `honk` cue needs a game-side `honk.ogg` (audio lane). Until then, `ui_back` is this game's
-  refusal sound.
+## Frames (looked at)
 
-**Suggested follow-up** (its own lane, hub/systems owner): in `refuse(player)`, shake that player's Jarling only
-when it isn't busy or swapping, and flash the hint otherwise. Pin it with a test per refusal path (`refusals`
-plus a shake counter), and take frames with `HUB_DEMO`.
+These are real frames from `scripts/tools/shots.sh` with `HUB_DEMO`, fixture `hub_8`, rendered by Forward+ on the
+software GPU. They are in `handoff/frames/`, which is git-ignored, as before.
+- Idle shake (`follow;1:btn:0:12:1;1.05:btn:0:12:0;2.97:btn:0:2:1;3.0:btn:0:2:0`, X on P1's pad):
+  `refusal_01_idle_before_x.png`, `refusal_02_idle_x_head_shake.png`, `refusal_03_idle_x_shake_back.png`,
+  `refusal_04_idle_after_upright.png`, strip `refusal_strip_idle_shake.png`. The tilt is visible but modest in a still.
+- Mid-swap ring blink (same, plus `2.95:change`): `refusal_05_mid_swap_x_ring_blinks.png` (the ring is pale and big),
+  `refusal_06_mid_swap_after_ring_green.png`, strip `refusal_strip_mid_swap_ring.png`.
+- Inside the jar during a launch (`...;2:a;3.47:btn:0:2:1;3.5:btn:0:2:0`): `refusal_07_inside_jar_before_x.png`,
+  `refusal_08_inside_jar_x_p1_bar.png` (green bar, bottom left), `refusal_09_inside_jar_bar_gone.png`. The first take
+  had an 18 px bar at 0.9 alpha that was hard to see, so I made it 36 px and fully opaque, held for 0.1 s.
+- Not framed: the intro bar. Demo commands wait until the intro ends, so a scripted press can't land during it. The
+  test covers it.
 
-## Tests, frames, PLAN-STATUS
+## PLAN-STATUS
 
-- **Tests:** none added. With no code changed, I didn't re-run the suite. The last recorded run is FR3-1: 213 test
-  cases, 0 failures.
-- **Frames:** none. No pause menu or start menu exists to capture, and `handoff/frames/` is unchanged.
-- **PLAN-STATUS: no rows moved.** This game's FR-5 is "the hub hint changes with context, with controller glyphs",
-  already built. There are no FR-5 menu rows to move. Moved IDs: none.
+- **FR-4** updated in place: the proof has the 6 new tests and frames, and the notes describe the visible answer. Its
+  status was already `built` (for the sound), so no status changed and the totals are unchanged (95 rows). I added a
+  Hub-refusal-1 line to the run log.
+- Moved row IDs: **FR-4** (built → built, proof and notes extended). There was no separate "seen" row to move.
 
-## What would unblock it
+## For Gary / Hermes
 
-1. Merge `feature/template-press-answers-1` into the template's `dev`. Then a decision for Hermes or Kaden: should
-   the launcher get template menus at all? Today it deliberately has none.
-2. Or re-scope this lane to the hub-only visual above, with hub feel code explicitly allowed.
-
-## Commits
-
-- `docs: press-answers adoption blocked, no menus to adopt` (this report; `handoff/handoff.json` sits in the worktree, uncommitted, because `handoff/` is in the local git exclude).
+- The clean import extracted embedded character textures as untracked PNGs under `assets/characters/*/`. They are
+  not committed (art is off-limits, and they're import by-products). Delete them or ignore them as you prefer.
+- Worth a TV check: whether the 0.3 s head shake reads from the couch. Bump the angles in `HubJarling.shake()` if not.

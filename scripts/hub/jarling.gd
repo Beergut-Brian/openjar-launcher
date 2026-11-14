@@ -52,6 +52,12 @@ var hint_kind := HintGlyph.Kind.SELECT
 var _go_hint: Sprite3D              # "A: jump in" over the head while a jar is in focus (PF-1)
 var go_hint_kind := HintGlyph.Kind.A
 var _still := 0.0
+const REFUSE_SECONDS := 0.3        # a refused press: the shake or the ring flash lasts this long
+var shakes := 0                    # head shakes so far (tests read it)
+var flashes := 0                   # refusal ring flashes so far (tests read it)
+var _shake_tween: Tween
+var _ring_flash := 0.0             # seconds left of a refusal ring flash
+var _ring_mat: StandardMaterial3D
 
 
 func setup(model_scene: PackedScene, id: String, ring_color: Color, model_size: float = 1.15) -> void:
@@ -72,6 +78,7 @@ func setup(model_scene: PackedScene, id: String, ring_color: Color, model_size: 
 	_ring = MeshInstance3D.new()
 	_ring.mesh = torus
 	_ring.material_override = mat
+	_ring_mat = mat
 	_ring.scale = Vector3(1, 0.1, 1)
 	_ring.position.y = 0.03
 	_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -217,11 +224,31 @@ func hint_visible() -> bool:
 	return _hint.visible and _hint.modulate.a > 0.5
 
 
-## Nobody else to be: a quick no-no head shake (the hub plays the low sound).
+## A quick no-no head shake (nobody else to be, or a refused press; the hub plays the low sound).
+## It tilts the body in place and never moves the Jarling. About REFUSE_SECONDS; a new one restarts it.
 func shake() -> void:
-	var t := create_tween()
-	for k in [0.35, -0.35, 0.2, 0.0]:
-		t.tween_property(_flip, "rotation:z", k, 0.06)
+	shakes += 1
+	if _shake_tween != null and _shake_tween.is_valid():
+		_shake_tween.kill()
+	_flip.rotation.z = 0.0
+	_shake_tween = create_tween()
+	for k in [0.35, -0.35, 0.25, -0.15, 0.0]:
+		_shake_tween.tween_property(_flip, "rotation:z", k, REFUSE_SECONDS / 5.0)
+
+
+## A refused press while the Jarling is busy (mid-jump, mid-swap, launching): its ring blinks white
+## and pops for REFUSE_SECONDS. The body is left alone, so a jump or a swap is never disturbed.
+func flash() -> void:
+	flashes += 1
+	_ring_flash = REFUSE_SECONDS
+
+
+func ring_flashing() -> bool:
+	return _ring_flash > 0.0
+
+
+func ring_shown() -> bool:
+	return visible and _ring.visible
 
 
 ## A burst of cream puffs from `at` (local to `parent`), freed after 0.45 s.
@@ -366,7 +393,11 @@ func jump_out(mouth: Vector3, stand: Vector3) -> void:
 
 func _process(delta: float) -> void:
 	_clock += delta
-	_ring.scale = Vector3(1, 0.1, 1) * (1.0 + sin(_clock * 4.0) * 0.04)
+	_ring_flash = maxf(_ring_flash - delta, 0.0)
+	var blink := sin(_ring_flash / REFUSE_SECONDS * PI)   # 0 → 1 → 0 over the flash
+	_ring.scale = Vector3(1, 0.1, 1) * (1.0 + sin(_clock * 4.0) * 0.04 + 0.35 * blink)
+	_ring_mat.albedo_color = color.lerp(Color.WHITE, 0.8 * blink)
+	_ring_mat.emission = _ring_mat.albedo_color
 	_update_hint(delta)
 	_update_go_hint(delta)
 	if busy:
