@@ -410,7 +410,7 @@ func test_a_command_jar_launches_and_the_home_hold_brings_you_back() -> void:
 	var hub := await _hub(root)
 	hub.really_quit = false
 	assert_int(hub.spots.size()).is_equal(1)
-	assert_bool(hub.update_home(true, 5.0)).is_false()   # nothing running: Start is the quit hold
+	assert_bool(hub.update_home(true, 5.0)).is_false()   # nothing running: Start is the power menu hold
 	_walk_to_jar(hub, 0)
 	await _tap("p1_action")
 	await _wait_for_screen(hub, hub.Screen.RUNNING, 4.0)
@@ -425,7 +425,7 @@ func test_a_command_jar_launches_and_the_home_hold_brings_you_back() -> void:
 	assert_bool(hub.update_home(true, 1.0)).is_false()
 	assert_bool(hub.update_home(false, 0.1)).is_false()
 	var quits := [0]
-	hub.quitting.connect(func() -> void: quits[0] += 1)
+	hub.power_menu_opened.connect(func() -> void: quits[0] += 1)
 	Input.action_press("launcher_quit")                  # the real hold, through _process
 	await _wait(1.0)
 	assert_int(hub.screen).is_equal(hub.Screen.RUNNING)   # not yet
@@ -434,11 +434,11 @@ func test_a_command_jar_launches_and_the_home_hold_brings_you_back() -> void:
 	var st := []   # the browser went too (a zombie has exited; CI's PID 1 may never reap it)
 	var rc := OS.execute("cat", ["/proc/%s/stat" % browser], st)
 	assert_bool(rc != 0 or st.is_empty() or str(st[0]).substr(str(st[0]).rfind(")") + 2).begins_with("Z")).is_true()
-	await _wait(2.0)                                     # Start still down from the hold: no quit
+	await _wait(2.0)                                     # Start still down from the hold: no power menu
 	Input.action_release("launcher_quit")
 	await _wait(0.1)
 	assert_int(quits[0]).is_equal(0)
-	Input.action_press("launcher_quit")                  # a fresh hold still quits
+	Input.action_press("launcher_quit")                  # a fresh hold still opens the power menu
 	await _wait(QUIT_WAIT)
 	Input.action_release("launcher_quit")
 	assert_int(quits[0]).is_equal(1)

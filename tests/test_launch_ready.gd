@@ -144,7 +144,7 @@ func test_a_whole_session_never_softlocks() -> void:
 	var launches := [0]
 	var quit := [false]
 	hub.launched.connect(func(_s: String, _p: String) -> void: launches[0] += 1)
-	hub.quitting.connect(func() -> void: quit[0] = true)
+	hub.power_menu_opened.connect(func() -> void: quit[0] = true)
 	# boot: the intro plays, A skips it and the Jarlings pop in
 	var intro: HubIntro = hub.play_intro()
 	assert_bool(hub.intro_playing()).is_true()
@@ -184,16 +184,16 @@ func test_a_whole_session_never_softlocks() -> void:
 	await _launch_and_return(hub, Players.P1)
 	assert_int(launches[0]).is_equal(3)
 	assert_str(_log_lines()[2]).starts_with("b-game --profile=p2")
-	# and Start held leaves
+	# and Start held opens the power menu (NS-1: there is nothing to quit to)
 	for i in 20:
 		hub.update_quit(true, 0.1)
 	assert_bool(quit[0]).is_true()
 
 
-func test_start_held_during_the_intro_quits() -> void:
+func test_start_held_during_the_intro_opens_the_power_menu() -> void:
 	var hub := await _hub()
 	var quit := [false]
-	hub.quitting.connect(func() -> void: quit[0] = true)
+	hub.power_menu_opened.connect(func() -> void: quit[0] = true)
 	hub.set_process(false)
 	hub.play_intro()
 	for i in 16:
@@ -208,7 +208,7 @@ func test_start_held_through_a_launch_never_leaves_a_game_running() -> void:
 	_walk_to_jar(hub, 1)
 	hub.press_action(Players.P1)
 	assert_bool(hub.launch.active).is_true()
-	hub.quit_to_steam()   # the hold completed mid-animation
+	hub.open_power_menu()   # the hold completed mid-animation: the power menu (NS-1)
 	_step(hub, LaunchSequence.T_GO + 0.5)
 	assert_int(launches[0]).is_equal(0)
 	assert_int(hub.screen).is_equal(hub.Screen.HUB)

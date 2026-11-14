@@ -1,5 +1,5 @@
-## K-02: Start only leaves the launcher when held QUIT_HOLD s; a tap ticks, shows the badge and
-## does nothing else. Ignored while a game runs. Own Save profile, fixture roster, fixture jars.
+## K-02: Start only opens the power menu (NS-1; it never quits) when held QUIT_HOLD s; a tap ticks,
+## shows the badge and does nothing else. Ignored while a game runs. Own Save profile, fixture roster, fixture jars.
 class_name TestQuitHold
 extends GdUnitTestSuite
 
@@ -48,7 +48,7 @@ func _hub() -> Node3D:
 func test_a_tap_on_start_does_not_quit_but_shows_the_badge() -> void:
 	var hub: Node3D = await _hub()
 	var quit := [false]
-	hub.quitting.connect(func() -> void: quit[0] = true)
+	hub.power_menu_opened.connect(func() -> void: quit[0] = true)
 	assert_bool(hub.update_quit(true, 0.2)).is_false()
 	assert_float(hub.quit_meter.progress).is_greater(0.0)
 	assert_bool(hub.update_quit(false, 0.016)).is_false()
@@ -58,10 +58,10 @@ func test_a_tap_on_start_does_not_quit_but_shows_the_badge() -> void:
 	assert_bool(quit[0]).is_false()
 
 
-func test_holding_start_quits() -> void:
+func test_holding_start_opens_the_power_menu() -> void:
 	var hub: Node3D = await _hub()
 	var quit := [false]
-	hub.quitting.connect(func() -> void: quit[0] = true)
+	hub.power_menu_opened.connect(func() -> void: quit[0] = true)
 	var t := 0.0
 	while t < hub.QUIT_HOLD - 0.1:
 		assert_bool(hub.update_quit(true, 0.1)).is_false()
