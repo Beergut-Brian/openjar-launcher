@@ -150,7 +150,7 @@ lands on its pad, and the lid drops out of the sky and lands on the jar with a `
    **Jeff and Chuck** are player-locked characters, so they are never a profile: they live on the
    island as residents, Jeff on the left (P1's side) and Chuck on the right, and cheer when someone
    jumps into a jar or a second player joins.
-7. **Start:** back to Steam. **LB+RB held 1 s:** dev jars appear / disappear.
+7. **Start (held):** the power menu (Back, Sleep, Shut down; no Steam on the TV box, 2026-11-14). **LB+RB held 1 s:** dev jars appear / disappear.
 
 Every one of these plays a sound (`ui_move`, `ui_confirm`, `ui_back`, `ui_toggle`, `player_join`,
 and the launch cues above) and moves something.

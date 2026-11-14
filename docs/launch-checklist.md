@@ -50,17 +50,18 @@ checks) and the Kaden items (V-01 / V-02 picks, and one question about Select+St
 
 ## Needs the TV box (Kaden's weekend)
 
-- [ ] **K-06, 60 fps at 1080p on the GTX 1060.** Boot the launcher from the Steam tile, plug in a keyboard and
+- [ ] **K-06, 60 fps at 1080p on the GTX 1060.** Boot the box (it starts the launcher at login), plug in a keyboard and
       press F3 (top-left overlay: `fps`). Read it (a) standing in the hub with 2 players, (b) during the intro
       (first boot of the day; to see it again, delete `launcher.intro_date` from the save or wait a day), (c)
       during a launch (walk to a jar, press A). Pass: 60 in all three, no visible hitches.
-- [ ] **Cold start (K-07, built on the box's numbers, confirm on the TV).** From the Steam tile press to a hub
+- [ ] **Cold start (K-07, built on the box's numbers, confirm on the TV).** From login to a hub
       you can walk in under 10 s. Read the `launcher: interactive ... after N ms` line in the log for the first
       boot of the day (with an `intro` mark) and a second boot.
 - [ ] **8BitDo pads on the TV:** the first pad's A makes it P1 (green ring), the second pad's A or a stick push
       makes it P2 (red ring); switch P2's pad off: a "bye-bye" blip and a hop; D-pad walks both; Select changes
       character on that player's own pad only; LB+RB held 1 s shows the dark-lid dev jars; Start tapped shows
-      the door badge, held 1.5 s quits to Steam.
+      the door badge, held 1.5 s opens the power menu (Back closes it; Sleep suspends the box and it wakes in
+      the hub; Shut down needs A held until its ring fills).
 - [ ] **One launch and return (S-02):** walk to a jar, press A; the game opens full screen; quit it from its
       pause menu; the hub comes back full screen and in front. Log: `launcher: window:` lines.
 - [ ] **Smash Party (C-14):** `kiosk/smash-party/install.sh` once; launch its jar, play with a pad in the
@@ -70,8 +71,8 @@ checks) and the Kaden items (V-01 / V-02 picks, and one question about Select+St
 ## Needs Kaden
 
 - [ ] **Select+Start in the hub.** In the games, Select+Start held 2 s is solo. In the hub, the same hold changes your
-      character (Select) and then quits to Steam at 1.5 s (Start hold), frames `solo_combo_*`. Keep it, or have
-      the hub ignore the Start hold while Select is held?
+      character (Select) and then left the launcher at 1.5 s (Start hold), frames `solo_combo_*`. Keep it, or have
+      the hub ignore the Start hold while Select is held? (Decided by Gary 2026-11-14, FR-8: ignored.)
 - [ ] V-01: pick a logo (`art/logo/compare.png`, A/B/C); then the intro logo and `store/` art are redone (Art Director process).
 - [ ] V-02: pick a palette (`art/palettes/compare.png`).
 - [ ] (Optional, open since 2026-11-10) K-02: keep Start as a 1.5 s hold, or go back to one press.
@@ -82,7 +83,7 @@ checks) and the Kaden items (V-01 / V-02 picks, and one question about Select+St
    `build/openjar.json` (`dev: true` for `-dev` tags) and attaches the zip to the GitHub Release.
 2. On the TV box: `openjar-tv/update.sh` installs the release zip as `~/Games/openjar/openjar-launcher/`
    (dev builds as `openjar-launcher-dev/`).
-3. The Steam tile "Open Jar Games" runs the launcher binary; it reads every `~/Games/openjar/*/openjar.json`
+3. The box starts the launcher binary at login (its home screen; no Steam since 2026-11-14); it reads every `~/Games/openjar/*/openjar.json`
    (or `$OPENJAR_ROOT`). The first log line is `launcher: version v...`.
 4. To try a build by hand: unzip it anywhere and run `./game.x86_64` (add `-- --demo` for the demo tour).
 
