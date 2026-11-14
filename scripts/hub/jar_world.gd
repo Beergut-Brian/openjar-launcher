@@ -239,28 +239,32 @@ static func build_retro(c: Color = RETRO_ACCENT) -> Node3D:
 				continue
 			_a(D, _box(Vector3(tile, 0.02, tile)), _m(floor_b, 0.6), p)
 	var cart := Node3D.new()
-	cart.position = Vector3(0, 0.12, 0.02)
-	cart.rotation_degrees = Vector3(-6, -12, 0)
+	cart.position = Vector3(0, 0.12, 0)
+	cart.rotation_degrees = Vector3(0, 0, -5)
+	cart.scale = Vector3.ONE * 1.12
 	D.add_child(cart)
-	var body := _m(c.lerp(Color("d8d4e8"), 0.55), 0.5)
-	var dark := _m(c.darkened(0.35), 0.6)
-	_a(cart, _box(Vector3(0.96, 0.98, 0.2)), body, Vector3(0, 0.6, 0))           # the body
-	_a(cart, _box(Vector3(0.78, 0.16, 0.2)), body, Vector3(-0.09, 1.17, 0))      # top, one corner cut
-	_a(cart, _box(Vector3(0.16, 0.08, 0.2)), body, Vector3(0.31, 1.13, 0))       # the stepped (pixel) corner
-	for i in 3:   # grip ridges low on the front
-		_a(cart, _box(Vector3(0.62, 0.035, 0.04)), dark, Vector3(0, 0.2 + i * 0.07, 0.115))
-	_a(cart, _box(Vector3(0.66, 0.5, 0.03)), _m(Color("fff4dc"), 0.7), Vector3(0, 0.75, 0.11))   # the label
+	var body := _m(c.lerp(Color("d8d4e8"), 0.2), 0.45)
+	var dark := _m(c.darkened(0.45), 0.6)
+	var heart_color := Color("ff7ac8")   # never a player's green or red (V-08)
+	_a(cart, _box(Vector3(0.96, 0.98, 0.26)), body, Vector3(0, 0.6, 0))          # the body
+	_a(cart, _box(Vector3(0.78, 0.16, 0.26)), body, Vector3(-0.09, 1.17, 0))     # top, one corner cut
+	_a(cart, _box(Vector3(0.16, 0.08, 0.26)), body, Vector3(0.31, 1.13, 0))      # the stepped (pixel) corner
+	_a(cart, _box(Vector3(0.8, 0.1, 0.2)), dark, Vector3(0, 0.07, 0))            # the edge it plugs in by
 	var heart := [".XX.XX.", "XXXXXXX", "XXXXXXX", ".XXXXX.", "..XXX..", "...X..."]
-	var px := 0.055
-	var pop := Color.from_hsv(fposmod(c.h + 0.5, 1.0), 0.6, 1.0)
-	for row in heart.size():
-		for col in heart[row].length():
-			if heart[row][col] == "X":
-				_a(cart, _box(Vector3(px, px, 0.02)), _glow(pop, 1.8),
-						Vector3((col - 3) * px, 0.92 - row * px, 0.13))
-	_a(cart, _box(Vector3(0.8, 0.1, 0.16)), dark, Vector3(0, 0.07, 0))           # the edge it plugs in by
-	for i in 7:   # gold contacts
-		_a(cart, _box(Vector3(0.05, 0.08, 0.01)), _glow(Color("ffd23f"), 1.6), Vector3(-0.3 + i * 0.1, 0.07, 0.085))
+	var px := 0.06
+	for side: float in [1.0, -1.0]:   # the same face front and back: the turntable shows both
+		var z := 0.13 * side
+		for i in 3:   # grip ridges low on the face
+			_a(cart, _box(Vector3(0.62, 0.035, 0.04)), dark, Vector3(0, 0.2 + i * 0.07, z + 0.01 * side))
+		_a(cart, _box(Vector3(0.68, 0.52, 0.02)), _m(Color("fff4dc"), 0.7), Vector3(0, 0.76, z))   # the label
+		for row in heart.size():
+			for col in heart[row].length():
+				if heart[row][col] == "X":
+					_a(cart, _box(Vector3(px, px, 0.02)), _glow(heart_color, 1.6),
+							Vector3((col - 3) * px * side, 0.94 - row * px, z + 0.015 * side))
+		for i in 7:   # gold contacts
+			_a(cart, _box(Vector3(0.05, 0.08, 0.01)), _glow(Color("ffd23f"), 1.6), Vector3(-0.3 + i * 0.1, 0.07, (0.105) * side))
+	var pop := heart_color
 	for i in 5:   # glowing pixel cubes floating round it
 		var a := TAU * i / 5.0 + 0.4
 		var cube := _a(D, _box(Vector3.ONE * (0.07 + 0.02 * (i % 2))), _glow([pop, Color("8fe3ff"), Color("ffd23f")][i % 3], 2.2),

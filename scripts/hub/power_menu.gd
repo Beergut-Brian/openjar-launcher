@@ -152,16 +152,19 @@ func _draw() -> void:
 		draw_circle(c, r + 9.0, Color(CREAM, a * (1.0 if on else 0.55)))
 		draw_circle(c, r, Color(INK, a))
 		var tint: Color = TINTS[item]
-		if on and item == Item.SHUT_DOWN and confirm > 0.0:
-			draw_arc(c, r + 15.0, -PI / 2.0, -PI / 2.0 + TAU * confirm, 64, Color(tint, a), 16.0, true)
+		if on and item == Item.SHUT_DOWN and (confirm > 0.0 or _holding):   # the hold's ring, outside the focus ring
+			draw_arc(c, r + 44.0, 0.0, TAU, 64, Color(CREAM, 0.35 * a), 16.0, true)
+			draw_arc(c, r + 44.0, -PI / 2.0, -PI / 2.0 + TAU * confirm, 64, Color(tint, a), 16.0, true)
 		var ink := Color(tint, a * (1.0 if on else 0.6))
 		_icon(item, c, r / RADIUS, ink, a)
-	if _open and focus < items.size():   # the pad's A under the focused button: press (or hold) it
-		var c := button_centre(focus) + Vector2(0, RADIUS * 1.18 + 70.0)
-		var g := HintGlyph.texture(HintGlyph.Kind.A, FILL)
-		if g != null:
-			var sz := Vector2(g.get_size()) * 0.62
-			draw_texture_rect(g, Rect2(c - sz * 0.5, sz), false, Color(1, 1, 1, a))
+	if _open and focus < items.size():   # the pad's A under the focused button: press it (hold it on Shut down)
+		var c := button_centre(focus) + Vector2(0, RADIUS * 1.18 + (96.0 if focused() == Item.SHUT_DOWN else 70.0))
+		draw_circle(c, 34.0, Color(CREAM, a))
+		draw_circle(c, 28.0, Color(INK, a))
+		var font := ThemeDB.fallback_font
+		var fs := 40
+		var w := font.get_string_size("A", HORIZONTAL_ALIGNMENT_LEFT, -1, fs)
+		draw_string(font, c + Vector2(-w.x * 0.5, w.y * 0.32), "A", HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(FILL, a))
 
 
 func _icon(item: Item, c: Vector2, s: float, ink: Color, a: float) -> void:
