@@ -294,6 +294,7 @@ func test_quit_launcher_without_allow_quit_does_nothing() -> void:
 func test_power_actions_dry_run_never_calls_systemctl() -> void:
 	var p := PowerActions.new()
 	p.dry_run = true
+	p.dry_quit = true
 	assert_int(p.sleep()).is_equal(0)
 	assert_int(p.shut_down()).is_equal(0)
 	p.quit(get_tree())   # dry: logs, never quits the test run
@@ -307,6 +308,7 @@ func test_a_test_run_hub_is_a_dry_run_even_without_a_fake() -> void:
 	add_child(hub)
 	await get_tree().process_frame
 	assert_bool(hub.power.dry_run).is_true()
+	assert_bool(hub.power.dry_quit).is_true()
 
 
 # ---------------------------------------------------------------- the emulator jar (NS-2)

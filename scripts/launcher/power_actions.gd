@@ -7,7 +7,8 @@ extends RefCounted
 const SLEEP := ["suspend"]
 const SHUT_DOWN := ["poweroff"]
 
-var dry_run := false
+var dry_run := false          # systemctl is only logged
+var dry_quit := false         # the dev quit is only logged (test runs: it would end the test runner)
 var asked: Array[String] = []   # what was asked for, in order ("sleep", "shut_down", "quit")
 
 
@@ -25,8 +26,8 @@ func shut_down() -> int:
 ## starts the launcher again; on a desktop you are back at the shell.
 func quit(tree: SceneTree) -> void:
 	asked.append("quit")
-	print("launcher: power: dev quit, exit 0%s" % (" (dry run)" if dry_run else ""))
-	if dry_run or tree == null:
+	print("launcher: power: dev quit, exit 0%s" % (" (dry run)" if dry_quit else ""))
+	if dry_quit or tree == null:
 		return
 	var audio := tree.root.get_node_or_null("Audio")
 	if audio != null:

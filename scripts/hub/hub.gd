@@ -214,6 +214,8 @@ func _ready() -> void:
 	allow_quit = allow_quit or args.has(ALLOW_QUIT_ARG) or OS.get_environment("OPENJAR_ALLOW_QUIT") == "1"
 	if Roster.is_test_run(args) or not demo.is_empty():
 		power.dry_run = true   # a test or a scripted run never suspends or powers off the box
+	if Roster.is_test_run(args):
+		power.dry_quit = true  # and a test never ends the test runner (a scripted run may: --allow-quit)
 	power_menu = PowerMenu.new()
 	layer.add_child(power_menu)
 	power_menu.set_allow_quit(allow_quit)
@@ -1466,6 +1468,7 @@ func _run_demo() -> void:
 			"holdstart": _demo_quit_until = _clock + float(d[2])   # hold Start this long (frames of the badge)
 			"power": open_power_menu()                            # the power menu, as if Start was held
 			"pnext": power_menu.step(1)                           # its focus one button right
+			"ppress": power_menu.press()                          # A on the focused button
 			"pconfirm": power_menu.confirm = float(d[2])         # a frame of the Shut down hold's ring
 			"wide": _intro_hold = true
 			"follow": _intro_hold = false
