@@ -27,7 +27,7 @@ is no shortcut that runs you to a jar.
 | B | Solo: switch save profile (you stay put and become that profile's pick). Two players: a cheer |
 | Select / Back (Tab or `/` on keys) | Change your character in place: poof, the next one pops out, its name over your head. Two players: the other's pick is skipped |
 | Hold LB + RB for 1 s | Toggle showing the `(dev)` builds (their jars wear a dark lid). Every launcher start shows main-branch (stable) games only; the toggle lasts for that run (Kaden 2026-11-10) |
-| Start (hold 1.5 s) | Quit to Steam. A badge with an open door shows while held and its ring fills; a tap only ticks |
+| Start (hold 1.5 s) | Quit to Steam. A badge with an open door shows while held and its ring fills; a tap only ticks. Never while Select is held (Select + Start is the games' solo gesture) |
 | (P2's pad goes away) | P2 drops out: a "bye-bye" blip, their Jarling hops and tags along again |
 
 ## Core loop
@@ -75,6 +75,7 @@ installed (Smash Party via its kiosk shortcut counts), launches one, comes back.
 - Anything a kid has to read.
 
 ## Decisions made without Kaden
+- 2026-11-14 (Gary): Select + Start held for 2 s is the playtest solo gesture of the games, so in the hub, while Select is held, Start does nothing: no quit, no other action, and the Select that came with it does not change the character. Quitting stays on Start held alone (or Escape). A Start press without Select is unchanged. While a command game runs, Select + Start is left to the game (the hub's home hold ignores it). Kaden can reverse this in chat.
 - 2026-11-14 (Gary): FR-3 decided. In the hub the D-pad and stick only walk (the standing rule), so the D-pad never cycles the chooser; the chooser stays on Select, on the joined player's own pad. There is no ready state, so B has nothing to un-ready (A at a jar launches; B during a launch is a refusal). Kids never meet a menu, and the walking rule stays simple. Kaden can reverse this in chat.
 - 2026-11-09 (Gary): a game without its own `jar` world keeps its poster as a small card behind the generated diorama, so games stay tell-apart-able until each ships its jar.
 - 2026-11-09 (Gary): the spun-off lid landing on the other Jarling's head is a one-time joke; it's back on the jar when you return.
