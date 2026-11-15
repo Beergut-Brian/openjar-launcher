@@ -54,6 +54,12 @@ checks) and the Kaden items (V-01 / V-02 picks, and one question about Select+St
       press F3 (top-left overlay: `fps`). Read it (a) standing in the hub with 2 players, (b) during the intro
       (first boot of the day; to see it again, delete `launcher.intro_date` from the save or wait a day), (c)
       during a launch (walk to a jar, press A). Pass: 60 in all three, no visible hitches.
+- [ ] **IG-1, playable on the Intel HD 530 (the box today).** Over SSH or a terminal on the box, with the launcher
+      service stopped: `<launcher binary> -- --bench` (60 s two-player route, then it quits by itself). The first
+      lines say `launcher: graphics tier low (auto; adapter ...)`; keep the last line, `BENCH avg=… low1=… tier=low
+      …`. Pass: `low1` 30 or more (`avg` near 60 is the stretch). If it misses, try `-- --bench --graphics=low` after
+      lowering `scaling_3d_scale` to 0.67 or setting `shadows` false in `data/graphics.json` (one line each), and
+      note both lines. With a GTX 1060 in: `-- --bench` should say `tier=high`; that is K-06's number.
 - [ ] **Cold start (K-07, built on the box's numbers, confirm on the TV).** From login to a hub
       you can walk in under 10 s. Read the `launcher: interactive ... after N ms` line in the log for the first
       boot of the day (with an `intro` mark) and a second boot.
