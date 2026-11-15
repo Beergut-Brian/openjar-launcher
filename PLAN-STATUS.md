@@ -29,6 +29,11 @@ the plan-status lane against the code, the test run and real frames, not against
   screen. New rows NS-1 (power menu), NS-2 (emulator command jar), NS-3 (Steam text gone); C-01, C-14, C-15, K-02, L-01,
   FR-6, FR-8 rewritten. `scripts/tools/test.sh` after a clean import exits 0: 243 test cases, 0 failures; exported build
   boots with 0 script errors (`handoff/` in that worktree). Three new rows, all built (no full recount this pass).
+- **Igpu-1** (`feature/launcher-igpu-1`, 2026-11-14): the TV box is an Intel HD 530 (Gary). Graphics tiers (`high` = the look
+  as it was, pinned; `low` for the HD 530), auto pick with `--graphics=` / `OPENJAR_GRAPHICS` overrides, and `-- --bench`. New
+  row IG-1 (partial: needs the bench number from the box); K-06 linked to it. `scripts/tools/test.sh` after a clean import
+  exits 0: 252 test cases, 0 failures, 0 engine errors; the exported build boots and benches with 0 script errors
+  (`handoff/` in that worktree). One new row (no full recount this pass).
 - **Vendor-theme-1** (`feature/launcher-vendor-theme-1`, 2026-11-11): `openjar-addons` v0.2.1 (9c91639) re-vendored;
   V-04 partial to built. Recount: 79 rows: 64 built, 11 superseded, 3 partial, 1 missing. `scripts/tools/test.sh`
   (clean import first) exits 0: 170 test cases, 0 failures (`handoff/test-output.txt`).
