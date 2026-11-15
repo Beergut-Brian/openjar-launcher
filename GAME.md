@@ -199,6 +199,34 @@ it ever exits. There is nothing to quit to, so:
   logos, no "RetroDECK", no words).
 - **NS-3.** No "quit to Steam" left in the UI, hints or docs.
 
+## Producer note 2026-11-14: the TV box is an Intel HD 530 (Gary; graphics tiers, bench)
+
+Gary, launcher-igpu-1 brief, 2026-11-14:
+
+> "The TV box is now known (Gary logged in 2026-11-14): Bazzite Linux, Intel i5-6400, **Intel HD Graphics
+> 530 only** (Skylake GT2, Mesa/Vulkan via ANV, 16 GB shared RAM), 1080p TV, two players split screen. A
+> GTX 1060 may go in later; until then the launcher hub must be **playable at a steady 30 fps minimum, 60
+> where it can**, on the HD 530. Kaden's bar for the four first games: 'launch ready state besides testing
+> on 1060 device' now applies to the box he actually has."
+
+What that means here (the hub has one shared camera for two players, K-05; "split screen" in the brief is
+the box's two-player use, so the bench drives both players on that camera):
+
+- **Two graphics tiers** in `data/graphics.json`, applied by `GraphicsTier` (`scripts/launcher/graphics_tier.gd`)
+  at boot: `high` is the hub exactly as it looked before (pinned by a test, for the 1060); `low` is for the
+  HD 530: no MSAA, FXAA instead, 0.75 render scale with FSR 1, one shadow cascade to 18 m with a cheaper
+  filter and a 2048 atlas, no glow (SSAO / SSIL / SSR / SDFGI / volumetric fog were never on), mesh LOD bias
+  up, draw distance 170 m with twice the haze, half the fireflies and sparkles, a 60 fps cap, vsync on.
+- **Auto pick:** `--graphics=low|high` on the command line wins, then `OPENJAR_GRAPHICS=low|high`, then the
+  GPU: NVIDIA or a discrete AMD card gets `high`, anything else (Intel integrated, an AMD APU, a software
+  renderer, an unknown adapter) gets `low`. Logged as `launcher: graphics tier low (auto; adapter ...)`.
+  A dev or local build shows the tier after the version in the corner (`v0.2.0-dev.1 · low`); a release
+  shows only the version.
+- **Bench:** `<launcher> -- --bench` plays a fixed two-player route for 60 s (after a 2 s warm-up), prints
+  `BENCH t=5 fps=… low1=… ms=… max_ms=…` every 5 s and `BENCH avg=… low1=… tier=… frames=… seconds=60
+  adapter=…` at the end, then quits with code 0. Picks go to the demo file, power is a dry run. Gary runs it
+  on the box; the target is `low1` 30 or more, `avg` near 60.
+
 ## Playtest 2026-11-12 changes (Kaden; these supersede the sections above)
 Kaden: "Players should be able to walk around independently. Right now we're stuck together. Either
 player can launch a game." and "Dev mode shows multiple versions of the game. It should only show the

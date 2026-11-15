@@ -138,7 +138,7 @@ static func _clouds(root: Node3D) -> void:
 
 static func _fireflies(root: Node3D) -> void:
 	var p := CPUParticles3D.new()
-	p.amount = 70
+	p.amount = GraphicsTier.particles(70)   # half on the low tier
 	p.lifetime = 7.0
 	p.preprocess = 7.0
 	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX

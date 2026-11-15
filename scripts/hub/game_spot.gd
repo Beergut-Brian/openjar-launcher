@@ -341,7 +341,7 @@ func _build(world: Node3D, art: Texture2D) -> void:
 	_sparkles = CPUParticles3D.new()
 	_sparkles.emitting = false
 	_sparkles.one_shot = true
-	_sparkles.amount = 36
+	_sparkles.amount = GraphicsTier.particles(36)   # half on the low tier
 	_sparkles.lifetime = 0.9
 	_sparkles.explosiveness = 0.92
 	_sparkles.direction = Vector3.UP
