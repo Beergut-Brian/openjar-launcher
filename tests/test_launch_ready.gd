@@ -298,8 +298,13 @@ func test_the_corner_shows_the_release_version() -> void:
 	assert_str(script.version_text("")).is_equal("v?")
 	var hub := await _hub()
 	assert_object(hub.version_label).is_not_null()
-	assert_str(hub.version_label.text).is_equal(
-			"v" + str(ProjectSettings.get_setting("application/config/version")).trim_prefix("v"))
+	var v := "v" + str(ProjectSettings.get_setting("application/config/version")).trim_prefix("v")
+	assert_str(hub.version_label.text).is_equal(script.label_text(v, hub.graphics_tier))
+	assert_str(hub.version_label.text).starts_with(v)
+	# igpu-1: a dev or local build names its graphics tier; a release shows only the version
+	assert_str(script.label_text("v0.1.0-dev.3", "low")).is_equal("v0.1.0-dev.3 · low")
+	assert_str(script.label_text("v0.0.0-local", "high")).is_equal("v0.0.0-local · high")
+	assert_str(script.label_text("v0.1.0", "low")).is_equal("v0.1.0")
 	assert_float(hub.version_label.get_theme_color("font_color").a).is_less(0.6)   # quiet, not for kids
 
 
