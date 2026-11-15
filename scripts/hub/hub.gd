@@ -149,6 +149,13 @@ var _say_in := { Players.P1: -1.0, Players.P2: -1.0 }
 var intro: HubIntro = null
 var _marks: Array = []                   # K-07 cold start: [step, ms since engine start]
 var _demo_zero := 0.0                    # demo times count from here (the end of the intro, if any)
+## Graphics tier in force (GraphicsTier: low on the HD 530, high on NVIDIA / discrete AMD).
+var graphics_tier := GraphicsTier.HIGH
+var graphics_settings: Dictionary = {}
+var environment: Environment
+var sun_light: DirectionalLight3D
+## --bench: the fixed two-player route (BenchRun) is running; null otherwise.
+var bench: BenchRun = null
 
 @onready var camera: Camera3D = $Camera
 @onready var world: Node3D = $World
@@ -159,9 +166,13 @@ var _demo_zero := 0.0                    # demo times count from here (the end o
 func _ready() -> void:
 	_mark("ready")
 	_build_sky_and_lights()
+	_apply_graphics(OS.get_cmdline_args() + OS.get_cmdline_user_args())
 	HubWorld.build(world)
 	profile = LauncherState.profile(Save)
 	var demo := demo_script(OS.get_environment("HUB_DEMO"), OS.get_cmdline_args() + OS.get_cmdline_user_args())
+	var bench_args := OS.get_cmdline_args() + OS.get_cmdline_user_args()
+	if BenchRun.wanted(bench_args) and OS.get_environment("HUB_DEMO").is_empty():
+		demo = BenchRun.ROUTE   # a scripted run: own picks, dry-run power, no intro
 	if not demo.is_empty():   # a demo or shots run never changes anybody's real picks
 		Roster.picks_path = DEMO_PICKS
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(DEMO_PICKS))
@@ -224,7 +235,7 @@ func _ready() -> void:
 		print("launcher: %s: the power menu has a dev quit (exit 0)" % ALLOW_QUIT_ARG)
 	version_label = Label.new()   # for grown-ups: which build is on the TV (the release tag)
 	version_label.name = "Version"
-	version_label.text = version_text()
+	version_label.text = label_text(version_text(), graphics_tier)
 	version_label.add_theme_font_size_override("font_size", 18)
 	version_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.45))
 	version_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.35))
@@ -255,6 +266,10 @@ func _ready() -> void:
 		Audio.music("card_row_loop")
 	_update_camera(0.0)
 	_report_cold_start()
+	if BenchRun.wanted(bench_args):
+		bench = BenchRun.new()
+		bench.setup(self, BenchRun.seconds_from(bench_args))
+		add_child(bench)
 
 
 ## The intro plays on the first boot of each local day (GAME.md decisions), or when a demo script asks
@@ -312,6 +327,27 @@ func _report_cold_start() -> void:
 static func version_text(version: String = str(ProjectSettings.get_setting("application/config/version", ""))) -> String:
 	version = version.strip_edges().trim_prefix("v")
 	return "v" + version if not version.is_empty() else "v?"
+
+
+## The corner label: the version, plus the graphics tier on a dev or local build ("v0.3.0-dev.2 · low").
+static func label_text(version: String, tier: String) -> String:
+	return "%s · %s" % [version, tier] if is_dev_version(version) else version
+
+
+static func is_dev_version(version: String) -> bool:
+	return version.contains("-dev") or version.contains("-local") or version == "v?"
+
+
+## Picks the graphics tier (GraphicsTier.pick: flag, OPENJAR_GRAPHICS, then the GPU), applies it to this
+## window's viewport, the environment, the sun and the camera, and logs it. A test run leaves the engine
+## (frame cap, vsync, shadow atlas) alone.
+func _apply_graphics(args: PackedStringArray) -> void:
+	var why: Array = []
+	graphics_tier = GraphicsTier.pick(RenderingServer.get_video_adapter_name(),
+			RenderingServer.get_video_adapter_vendor(), args, OS.get_environment(GraphicsTier.ENV), why)
+	graphics_settings = GraphicsTier.apply(graphics_tier, get_viewport(), environment, sun_light, camera,
+			not Roster.is_test_run(args))
+	print("launcher: graphics tier %s (%s; adapter %s)" % [graphics_tier, why[0], GraphicsTier.adapter_text()])
 
 
 static func fallback_model(profile_id: String) -> PackedScene:
@@ -1403,6 +1439,7 @@ func _build_sky_and_lights() -> void:
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
+	environment = env
 
 	var sun := DirectionalLight3D.new()   # warm key from behind the jars: rim light on everything
 	sun.light_color = Color("ffc48a")
@@ -1413,6 +1450,7 @@ func _build_sky_and_lights() -> void:
 	sun.directional_shadow_split_1 = 0.3
 	sun.shadow_blur = 2.6
 	add_child(sun)
+	sun_light = sun
 	sun.look_at_from_position(LIGHT_DIR.normalized() * 10.0, Vector3.ZERO)
 	var fill := DirectionalLight3D.new()  # cool fill from the camera side so faces never go dark
 	fill.light_color = Color("b9b4ff")
