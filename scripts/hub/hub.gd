@@ -270,6 +270,8 @@ func _ready() -> void:
 		bench = BenchRun.new()
 		bench.setup(self, BenchRun.seconds_from(bench_args))
 		add_child(bench)
+	if BenchTrace.wanted(bench_args):
+		add_child(BenchTrace.new())
 
 
 ## The intro plays on the first boot of each local day (GAME.md decisions), or when a demo script asks

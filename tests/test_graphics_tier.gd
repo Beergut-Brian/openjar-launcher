@@ -227,6 +227,43 @@ func test_bench_quits_by_itself_with_the_summary_line() -> void:
 	assert_int(quits[0]).is_equal(1)   # once
 
 
+## launcher-k06-1: `--bench-trace` is opt-in, prints only TRACE lines (the box script greps BENCH) and
+## leaves the bench's own lines and maths as they were.
+func test_bench_trace_is_opt_in_and_never_touches_the_bench_lines() -> void:
+	assert_bool(BenchTrace.wanted(PackedStringArray(["--bench"]))).is_false()
+	assert_bool(BenchTrace.wanted(PackedStringArray(["--bench", "--bench-trace"]))).is_true()
+	assert_int(BenchTrace.compilations().size()).is_equal(5)
+	OS.set_environment(GraphicsTier.ENV, "low")
+	var hub := await _hub()
+	hub._parse_demo(BenchRun.ROUTE)
+	var quits := [0]
+	var b := BenchRun.new()
+	b.quit_fn = func() -> void: quits[0] += 1
+	b.warmup = 0.1
+	b.setup(hub, 1.3)
+	hub.add_child(b)
+	var trace := BenchTrace.new()
+	hub.add_child(trace)
+	var t := 0.0
+	while quits[0] == 0 and t < 6.0:
+		await get_tree().process_frame
+		t += get_process_delta_time()
+	assert_int(quits[0]).is_equal(1)
+	assert_str(trace.lines[0]).starts_with("TRACE start pso=")
+	var seconds := 0
+	for line in trace.lines:
+		assert_str(line).starts_with("TRACE ")
+		assert_bool(line.contains("BENCH")).is_false()
+		if line.begins_with("TRACE s="):
+			seconds += 1
+			assert_object(RegEx.create_from_string("process_max_ms=[0-9.]+ pso=\\+[0-9]+ \\(canvas [0-9]+ mesh "
+					+ "[0-9]+ surface [0-9]+ draw [0-9]+ spec [0-9]+\\) draws=").search(line)).is_not_null()
+	assert_int(seconds).is_greater_equal(1)
+	for line in b.lines:
+		assert_str(line).starts_with("BENCH ")
+	assert_object(RegEx.create_from_string("^BENCH avg=[0-9.]+ low1=[0-9.]+ tier=low ").search(b.summary)).is_not_null()
+
+
 func _hub() -> Node3D:
 	OS.set_environment("OPENJAR_ROOT", ProjectSettings.globalize_path("res://tests/fixtures/hub_8"))
 	var hub: Node3D = auto_free(load(HUB).instantiate())
